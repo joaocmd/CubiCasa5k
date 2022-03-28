@@ -99,29 +99,29 @@ class UncertaintyLoss(Module):
              'room loss with variance': [self.loss_rooms_var.data],
              'icon loss with variance': [self.loss_icons_var.data],
              'heatmap loss with variance': [self.loss_heatmap_var.data]}
-        return pd.DataFrame(data=d)
+        return pd.DataFrame(data={k: [e.cpu() for e in d[k]] for k in d})
 
     def get_var(self):
         variance = torch.exp(self.log_vars.data)
         mse_variance = torch.exp(self.log_vars_mse.data)
-        d = {'room variance': [variance[0]],
-             'icon variance': [variance[1]]}
+        d = {'room variance': [variance[0].cpu()],
+             'icon variance': [variance[1].cpu()]}
         for i, m in enumerate(mse_variance):
             key = 'heatmap ' + str(i)
-            d[key] = [m]
+            d[key] = [m.cpu()]
 
-        return pd.DataFrame(data=d)
+        return pd.DataFrame(data={k: [e.cpu() for e in d[k]] for k in d})
     
     def get_s(self):
         s = self.log_vars.data
         mse_s = self.log_vars_mse.data
-        d = {'room s': [s[0]],
-             'icon s': [s[1]]}
+        d = {'room s': [s[0].cuda()],
+             'icon s': [s[1].cuda()]}
         for i, m in enumerate(mse_s):
             key = 'heatmap s' + str(i)
-            d[key] = [m]
+            d[key] = [m.cuda()]
 
-        return pd.DataFrame(data=d)
+        return pd.DataFrame(data={k: [e.cpu() for e in d[k]] for k in d})
 
     def homosced_heatmap_mse_loss_mask(self, input, target, heatmap_mask, logvars):
         # we have n heatmaps, i.e. n heatmap tasks
