@@ -163,7 +163,6 @@ def train(args, log_dir, writer, logger):
             optimizer.step()
 
         avg_loss = np.mean(lossess)
-        avg_loss = np.inf
         loss = losses.mean()
         variance = variances.mean()
         s = ss.mean()
