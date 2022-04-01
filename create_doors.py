@@ -26,22 +26,10 @@ def make_line_segment(XX, YY):
 
     return sorted([s, e], key=lambda p: (p[0], -p[1]))
 
-def classify_door(el, panel_idx=0):
-    pol = next(p for p in el.childNodes if p.nodeName == "polygon")
-    points = pol.getAttribute("points").split(' ')
-    points = points[:-1]
-
-    X, Y = np.array([]), np.array([])
-    for a in points:
-        x, y = a.split(',')
-        X = np.append(X, float(x))
-        Y = np.append(Y, float(y))
-
-    s, e = make_line_segment(X, Y)
+def classify_panel(s, e, panel):
     centroid = (s + e)/2
     v = np.hstack((e - s, [0]))
 
-    panel = [p for p in el.childNodes if p.getAttribute("id") == "Panel"][panel_idx]
     path = next(p for p in panel.childNodes if p.nodeName == "path").getAttribute("d")
 
     startpoint = np.array(eval(path.split(' ')[0][1:]))
@@ -51,10 +39,35 @@ def classify_door(el, panel_idx=0):
     axis = "l" if distance(s, endpoint) < distance(e, endpoint) else "r"
 
     normal = np.hstack((endpoint - centroid, [0]))
-    
     orientation = "p" if np.cross(v, normal)[2] < 0 else "n" 
 
     return axis + orientation
+
+def classify_door(el, panel_idx=0):
+    cls = el.getAttribute('class')
+    if cls not in ('Door Swing Beside', 'Door Swing Opposite'):
+        return cls
+
+    pol = next(p for p in el.childNodes if p.nodeName == 'polygon')
+    points = pol.getAttribute('points').split(' ')
+    points = points[:-1]
+
+    X, Y = np.array([]), np.array([])
+    for a in points:
+        x, y = a.split(',')
+        X = np.append(X, float(x))
+        Y = np.append(Y, float(y))
+
+    s, e = make_line_segment(X, Y)
+
+    panels = [p for p in el.childNodes if p.getAttribute("id") == "Panel"]
+    if cls == 'Door Swing Beside':
+        if len(panels) > 1:
+            return 'Double-' + classify_panel(s, e, panels[0])[1] # doublep | doublen
+        else:
+            return 'Single-' + classify_panel(s, e, panels[0]) # lp | ln | rp | rn
+    if cls == 'Door Swing Opposite':
+        return 'Opposite-' + classify_panel(s, e, panels[0]) + classify_panel(s, e, panels[1])
 
 def crop_door(img, el):
     pol = next(p for p in el.childNodes if p.nodeName == "polygon")
@@ -81,7 +94,7 @@ def crop_door(img, el):
     dst = np.array([[padding, padding+width], [padding+width, padding+width], [width/2+padding, padding+width+1]]) # t is on unit vector
     M = cv2.getAffineTransform(np.float32(np.array([s, e, t])), np.float32(dst))
 
-    rotated = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]), cv2.INTER_CUBIC)
+    rotated = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]), cv2.INTER_CUBIC, borderMode = cv2.BORDER_CONSTANT, borderValue=[1, 1, 1])
     cropped = cv2.getRectSubPix(rotated, np.int0(np.array([width+2*padding, 2*(width+padding)])), (width/2+padding, padding+width))
     return cropped
 
@@ -94,26 +107,20 @@ def main(data_folder, data_file, output_folder):
     data_loader = DataLoader(normal_set, batch_size=1, num_workers=0)
     data_iter = iter(data_loader)
 
-    for idx, val in enumerate(tqdm(data_iter)):
+    for val in tqdm(data_iter):
         image = val['image']
         image = np.moveaxis(image[0].numpy(), 0, -1) / 2 + 0.5
-        svg = minidom.parse(data_folder + val['folder'][0] + 'model.svg')
+        folder = val['folder'][0]
+        svg = minidom.parse(data_folder + folder + 'model.svg')
         doors = [e for e in svg.getElementsByTagName("g") if e.getAttribute("id") == "Door"]
 
         for door_idx, d in enumerate(doors):
             cls = d.getAttribute("class")
             cropped = crop_door(image, d)
-            if cls == 'Door Swing Beside':
-                classification = classify_door(d)
-            elif cls == 'Door Swing Opposite':
-                cls1 = classify_door(d, panel_idx=0)
-                cls2 = classify_door(d, panel_idx=1)
-                classification = cls1 + cls2
-            else:
-                classification = cls
+            classification = classify_door(d)
 
             im = Image.fromarray((cropped*255).astype(np.uint8))
-            im.save(f'{output_folder}/{idx}-{door_idx}-{classification}.png')
+            im.save(f'{output_folder}{folder[1:-1].replace("/","_")}_{door_idx}-{classification}.png')
 
 if __name__ == '__main__':
     data_folder = 'data/cubicasa5k/'
