@@ -6,7 +6,9 @@ import numpy as np
 import os
 import cv2
 
-from PIL import Image
+# from PIL import Image
+
+import argparse
 
 def distance(a, b):
     return np.linalg.norm(a-b)
@@ -39,9 +41,9 @@ def classify_panel(s, e, panel):
     axis = "l" if distance(s, endpoint) < distance(e, endpoint) else "r"
 
     normal = np.hstack((endpoint - centroid, [0]))
-    orientation = "p" if np.cross(v, normal)[2] < 0 else "n" 
+    orientation = "u" if np.cross(v, normal)[2] < 0 else "d"
 
-    return axis + orientation
+    return orientation + axis
 
 def classify_door(el, panel_idx=0):
     cls = el.getAttribute('class')
@@ -63,11 +65,11 @@ def classify_door(el, panel_idx=0):
     panels = [p for p in el.childNodes if p.getAttribute("id") == "Panel"]
     if cls == 'Door Swing Beside':
         if len(panels) > 1:
-            return 'Double-' + classify_panel(s, e, panels[0])[1] # doublep | doublen
+            return 'Double_' + classify_panel(s, e, panels[0])[0] # doubleu | doubled
         else:
-            return 'Single-' + classify_panel(s, e, panels[0]) # lp | ln | rp | rn
+            return 'Single_' + classify_panel(s, e, panels[0]) # ul | ur | dl | dr
     if cls == 'Door Swing Opposite':
-        return 'Opposite-' + classify_panel(s, e, panels[0]) + classify_panel(s, e, panels[1])
+        return 'Opposite_' + '_'.join(sorted((classify_panel(s, e, panels[0]), classify_panel(s, e, panels[1])), reverse=True)[1::2])
 
 def crop_door(img, el):
     pol = next(p for p in el.childNodes if p.nodeName == "polygon")
@@ -82,14 +84,14 @@ def crop_door(img, el):
 
     s, e = make_line_segment(X, Y)
     centroid = (s + e)/2
-    v = np.hstack((e - s, [0]))
+    v = e - s
 
     n = np.array([-v[1], v[0]]) # counterclockwise perpendicular
     n /= np.linalg.norm(n)
     t = centroid + n
 
     # print(s, e, v , n, t)
-    width = np.linalg.norm(v)
+    width = np.linalg.norm(s-e)
     padding = 20
     dst = np.array([[padding, padding+width], [padding+width, padding+width], [width/2+padding, padding+width+1]]) # t is on unit vector
     M = cv2.getAffineTransform(np.float32(np.array([s, e, t])), np.float32(dst))
@@ -98,6 +100,53 @@ def crop_door(img, el):
     cropped = cv2.getRectSubPix(rotated, np.int0(np.array([width+2*padding, 2*(width+padding)])), (width/2+padding, padding+width))
     return cropped
 
+def stats(data_folder):
+    data = {}
+    for filename in tqdm(os.listdir(data_folder)):
+        cls = filename.split('-')[1].split('.')[0]
+        if cls not in data:
+            data[cls] = 0
+        data[cls] += 1
+    return data
+
+def rename(cls, flip):
+    replacements = {
+        'vertical': str.maketrans('udlr', 'dulr'),
+        'horizontal': str.maketrans('udlr', 'udrl'),
+        'both': str.maketrans('udlr', 'durl'),
+    }
+
+    if 'Double' in cls:
+        name, orientation = cls[:-1], cls[-1:]
+    elif 'Opposite' in cls:
+        name, orientation = cls[:-5], cls[-5:]
+    elif 'Single' in cls:
+        name, orientation = cls[:-2], cls[-2:]
+    else:
+        name, orientation = cls, ''
+
+    orientation = orientation.translate(replacements[flip])
+
+    return name + '_'.join(sorted(orientation.split('_'), reverse=True))
+
+
+def augment(data_folder):
+    for filename in tqdm(os.listdir(data_folder)):
+        name = filename.split('-')[0]
+        cls = filename.split('-')[1].split('.')[0]
+
+        if 'Single' in cls:
+            continue
+
+        img = cv2.imread(data_folder + filename)
+        vertical = cv2.flip(img, 0)
+        horizontal = cv2.flip(img, 1)
+        both = cv2.flip(img, -1)
+
+        cv2.imwrite(data_folder + f'/AUGvertical_{name}-{rename(cls, "vertical")}.png', vertical)
+        cv2.imwrite(data_folder + f'/AUGhorizontal_{name}-{rename(cls, "horizontal")}.png', horizontal)
+        cv2.imwrite(data_folder + f'/AUGboth_{name}-{rename(cls, "both")}.png', both)
+            
 def main(data_folder, data_file, output_folder):
 
     if not os.path.isdir(output_folder):
@@ -115,18 +164,35 @@ def main(data_folder, data_file, output_folder):
         doors = [e for e in svg.getElementsByTagName("g") if e.getAttribute("id") == "Door"]
 
         for door_idx, d in enumerate(doors):
-            cls = d.getAttribute("class")
             cropped = crop_door(image, d)
             classification = classify_door(d)
 
-            im = Image.fromarray((cropped*255).astype(np.uint8))
-            im.save(f'{output_folder}{folder[1:-1].replace("/","_")}_{door_idx}-{classification}.png')
+            cv2.imwrite(f'{output_folder}{folder[1:-1].replace("/","_")}_{door_idx}-{classification}.png', (cropped*255).astype(np.uint8))
+            # im = Image.fromarray((cropped*255).astype(np.uint8))
+            # im.save(f'{output_folder}{folder[1:-1].replace("/","_")}_{door_idx}-{classification}.png')
 
 if __name__ == '__main__':
-    data_folder = 'data/cubicasa5k/'
-    data_file = 'train.txt'
-    output_folder = 'doors/'
-    main(data_folder, data_file, output_folder)
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--data-folder', nargs='?', type=str, default='data/cubicasa5k/')
+    parser.add_argument('--data-file', nargs='?', type=str, default='train.txt')
+    parser.add_argument('--out-folder', nargs='?', type=str, default='doors/')
+    parser.add_argument('--stats', nargs='?', type=bool, default=False, const=True)
+    parser.add_argument('--augment', nargs='?', type=bool, default=False, const=True)
+    parser.add_argument('--yes', nargs='?', type=bool, default=False, const=True)
+
+    args = parser.parse_args()
+
+    if (args.stats):
+        data_stats = stats(args.out_folder)
+        for k in sorted(data_stats):
+            print(k, data_stats[k])
+    elif (args.augment):
+        augment(args.out_folder)
+    else:
+        if args.yes or input(f'Resume? This will overwrite current {args.out_folder}.'):
+            main(args.data_folder, args.data_file, args.out_folder)
+    # print(data_stats)
 
 
     # files = np.genfromtxt(data_file, dtype='str')
