@@ -67,7 +67,7 @@ def classify_door(el, panel_idx=0):
         else:
             return 'Single_' + classify_panel(s, e, panels[0]) # ul | ur | dl | dr
     if cls == 'Door Swing Opposite':
-        return 'Opposite_' + '_'.join(sorted((classify_panel(s, e, panels[0]), classify_panel(s, e, panels[1])), reverse=True)[1::2])
+        return 'Opposite_' + '_'.join(sorted((classify_panel(s, e, panels[0]), classify_panel(s, e, panels[1])), reverse=True))
 
 def crop_door(img, el):
     pol = next(p for p in el.childNodes if p.nodeName == "polygon")
@@ -192,7 +192,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--data-folder', nargs='?', type=str, default='data/cubicasa5k/')
-    parser.add_argument('--split', nargs='?', type=str, default='train')
+    parser.add_argument('--split', nargs='?', type=str, default='test')
     parser.add_argument('--out-folder', nargs='?', type=str, default='doors/')
     parser.add_argument('--stats', nargs='?', type=bool, default=False, const=True)
     parser.add_argument('--augment', nargs='?', type=bool, default=False, const=True)
