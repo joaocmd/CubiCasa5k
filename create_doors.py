@@ -108,6 +108,7 @@ def stats(data_folder):
                 split_data[cls] = 0
             split_data[cls] += 1
         data[split] = split_data
+
     return data
 
 def rename(cls, flip):
@@ -171,6 +172,22 @@ def main(data_folder, split, output_folder):
 
             cv2.imwrite(f'{output_folder}/{folder[1:-1].replace("/","_")}_{door_idx}-{classification}.png', (cropped*255).astype(np.uint8))
 
+def or_zero(x):
+   return x if x else 0
+
+def all_keys(stats):
+    splits = stats.keys()
+    all_classes = set()
+    for s in splits:
+        all_classes = all_classes.union(set(stats[s].keys()))
+    return all_classes
+
+def get_value(stats, split, cls):
+    if cls in stats[split]:
+        return stats[split][cls]
+    return 0
+    
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -185,14 +202,14 @@ if __name__ == '__main__':
 
     if (args.stats):
         data_stats = stats(args.out_folder)
-        for s in sorted(data_stats):
-            print(s + ':')
-            for k in sorted(data_stats[s]):
-                print('\t' + k, data_stats[s][k])
+
+        print('class,train,val,test')
+        for k in sorted(all_keys(data_stats)):
+            print(f'{k},' + ','.join(map(str, (get_value(data_stats, 'train', k), get_value(data_stats, 'val', k), get_value(data_stats, 'test', k)))))
     elif (args.augment):
         augment(args.out_folder)
     else:
-        if args.yes or not input(f'Resume? This will overwrite current {args.out_folder}{args.split}.').lower().startswith('n'):
+        if args.yes or not input(f'Resume? This will overwrite current {args.out_folder}{args.split}').lower().startswith('n'):
             main(args.data_folder, args.split, args.out_folder)
     # print(data_stats)
 
