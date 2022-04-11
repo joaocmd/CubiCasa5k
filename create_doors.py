@@ -4,10 +4,8 @@ from xml.dom import minidom
 from tqdm import tqdm
 import numpy as np
 import os
+import pathlib
 import cv2
-
-# from PIL import Image
-
 import argparse
 
 def distance(a, b):
@@ -102,11 +100,14 @@ def crop_door(img, el):
 
 def stats(data_folder):
     data = {}
-    for filename in tqdm(os.listdir(data_folder)):
-        cls = filename.split('-')[1].split('.')[0]
-        if cls not in data:
-            data[cls] = 0
-        data[cls] += 1
+    for split in os.listdir(data_folder):
+        split_data = {}
+        for filename in tqdm(os.listdir(data_folder + '/' + split)):
+            cls = filename.split('-')[1].split('.')[0]
+            if cls not in split_data:
+                split_data[cls] = 0
+            split_data[cls] += 1
+        data[split] = split_data
     return data
 
 def rename(cls, flip):
@@ -147,12 +148,13 @@ def augment(data_folder):
         cv2.imwrite(data_folder + f'/AUGhorizontal_{name}-{rename(cls, "horizontal")}.png', horizontal)
         cv2.imwrite(data_folder + f'/AUGboth_{name}-{rename(cls, "both")}.png', both)
             
-def main(data_folder, data_file, output_folder):
+def main(data_folder, split, output_folder):
 
+    output_folder = output_folder + '/' + split
     if not os.path.isdir(output_folder):
-        os.mkdir(output_folder)
+        pathlib.Path(output_folder).mkdir(parents=True)
     
-    normal_set = FloorplanSVG(data_folder, data_file, format='txt', original_size=False)
+    normal_set = FloorplanSVG(data_folder, split + '.txt', format='txt', original_size=False)
     data_loader = DataLoader(normal_set, batch_size=1, num_workers=0)
     data_iter = iter(data_loader)
 
@@ -167,15 +169,13 @@ def main(data_folder, data_file, output_folder):
             cropped = crop_door(image, d)
             classification = classify_door(d)
 
-            cv2.imwrite(f'{output_folder}{folder[1:-1].replace("/","_")}_{door_idx}-{classification}.png', (cropped*255).astype(np.uint8))
-            # im = Image.fromarray((cropped*255).astype(np.uint8))
-            # im.save(f'{output_folder}{folder[1:-1].replace("/","_")}_{door_idx}-{classification}.png')
+            cv2.imwrite(f'{output_folder}/{folder[1:-1].replace("/","_")}_{door_idx}-{classification}.png', (cropped*255).astype(np.uint8))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--data-folder', nargs='?', type=str, default='data/cubicasa5k/')
-    parser.add_argument('--data-file', nargs='?', type=str, default='train.txt')
+    parser.add_argument('--split', nargs='?', type=str, default='train')
     parser.add_argument('--out-folder', nargs='?', type=str, default='doors/')
     parser.add_argument('--stats', nargs='?', type=bool, default=False, const=True)
     parser.add_argument('--augment', nargs='?', type=bool, default=False, const=True)
@@ -185,13 +185,15 @@ if __name__ == '__main__':
 
     if (args.stats):
         data_stats = stats(args.out_folder)
-        for k in sorted(data_stats):
-            print(k, data_stats[k])
+        for s in sorted(data_stats):
+            print(s + ':')
+            for k in sorted(data_stats[s]):
+                print('\t' + k, data_stats[s][k])
     elif (args.augment):
         augment(args.out_folder)
     else:
-        if args.yes or input(f'Resume? This will overwrite current {args.out_folder}.'):
-            main(args.data_folder, args.data_file, args.out_folder)
+        if args.yes or not input(f'Resume? This will overwrite current {args.out_folder}{args.split}.').lower().startswith('n'):
+            main(args.data_folder, args.split, args.out_folder)
     # print(data_stats)
 
 
