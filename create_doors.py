@@ -133,21 +133,23 @@ def rename(cls, flip):
 
 
 def augment(data_folder):
-    for filename in tqdm(os.listdir(data_folder)):
-        name = filename.split('-')[0]
-        cls = filename.split('-')[1].split('.')[0]
+    for split in os.listdir(data_folder):
+        out_folder = data_folder + '/' + split + '/'
+        for filename in tqdm(os.listdir(out_folder)):
+            name = filename.split('-')[0]
+            cls = filename.split('-')[1].split('.')[0]
 
-        if 'Single' in cls:
-            continue
+            if 'Single' in cls: # ignore single doors, too many of those
+                continue
 
-        img = cv2.imread(data_folder + filename)
-        vertical = cv2.flip(img, 0)
-        horizontal = cv2.flip(img, 1)
-        both = cv2.flip(img, -1)
+            img = cv2.imread(out_folder + filename)
+            vertical = cv2.flip(img, 0)
+            horizontal = cv2.flip(img, 1)
+            both = cv2.flip(img, -1)
 
-        cv2.imwrite(data_folder + f'/AUGvertical_{name}-{rename(cls, "vertical")}.png', vertical)
-        cv2.imwrite(data_folder + f'/AUGhorizontal_{name}-{rename(cls, "horizontal")}.png', horizontal)
-        cv2.imwrite(data_folder + f'/AUGboth_{name}-{rename(cls, "both")}.png', both)
+            cv2.imwrite(out_folder + f'AUGvertical_{name}-{rename(cls, "vertical")}.png', vertical)
+            cv2.imwrite(out_folder + f'AUGhorizontal_{name}-{rename(cls, "horizontal")}.png', horizontal)
+            cv2.imwrite(out_folder + f'AUGboth_{name}-{rename(cls, "both")}.png', both)
             
 def main(data_folder, split, output_folder):
 
