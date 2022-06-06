@@ -399,7 +399,7 @@ def get_polygons(predictions, threshold, all_opening_types):
     if len(polygons) > 0:
         polygons, types = remove_overlapping_openings(polygons, types, classes)
 
-    return polygons, types, room_polygons, room_types
+    return polygons, types, room_polygons, room_types, junction_points
 
 
 

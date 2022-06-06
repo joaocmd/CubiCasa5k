@@ -1,5 +1,6 @@
 import numpy as np
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
+import os
 import logging
 import argparse
 import torch
@@ -97,7 +98,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     log_dir = args.log_path + '/' + time_stamp + '/'
-    writer = SummaryWriter(log_dir)
+    writer = None #SummaryWriter(log_dir)
+    os.mkdir(log_dir)
     logger = logging.getLogger('eval')
     logger.setLevel(logging.DEBUG)
     fh = logging.FileHandler(log_dir+'/eval.log')
