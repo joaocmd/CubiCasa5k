@@ -28,7 +28,6 @@ class FloorplanSVG(Dataset):
                                   max_readers=8, lock=False,
                                   readahead=True, meminit=False)
             self.get_data = self.get_lmdb
-            self.is_transform = False
 
         self.data_folder = data_folder
         # Load txt file to list
@@ -40,6 +39,10 @@ class FloorplanSVG(Dataset):
 
     def __getitem__(self, index):
         sample = self.get_data(index)
+
+        if self.get_data == self.get_lmdb:
+            sample['image'] = sample['image'].float()
+            sample['label'] = sample['label'].float()
 
         if self.augmentations is not None:
             sample = self.augmentations(sample)
@@ -58,7 +61,7 @@ class FloorplanSVG(Dataset):
         # Getting labels for segmentation and heatmaps
         house = House(self.data_folder + self.folders[index] + self.svg_file_name, height, width)
         # Combining them to one numpy tensor
-        label = torch.tensor(house.get_segmentation_tensor().astype(np.float32))
+        label = torch.tensor(house.get_segmentation_tensor().astype(np.uint8))
         heatmaps = house.get_heatmap_dict()
         coef_width = 1
         if self.original_size:
@@ -77,7 +80,7 @@ class FloorplanSVG(Dataset):
             for key, value in heatmaps.items():
                 heatmaps[key] = [(int(round(x*coef_width)), int(round(y*coef_height))) for x, y in value]
 
-        img = torch.tensor(fplan.astype(np.float32))
+        img = torch.tensor(fplan.astype(np.uint8))
 
         sample = {'image': img, 'label': label, 'folder': self.folders[index],
                   'heatmaps': heatmaps, 'scale': coef_width}
@@ -87,6 +90,7 @@ class FloorplanSVG(Dataset):
     def get_lmdb(self, index):
         key = self.folders[index].encode()
         with self.lmdb.begin(write=False) as f:
+            print(key)
             data = f.get(key)
 
         sample = pickle.loads(data)
