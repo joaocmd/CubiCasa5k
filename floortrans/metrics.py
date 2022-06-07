@@ -124,7 +124,8 @@ def polygons_to_tensor(polygons_val, types_val, room_polygons_val, room_types_va
         else:
             d = 0
         jj, ii = draw.polygon(polygons_val[i][:, 1], polygons_val[i][:, 0])
-        ten[pol_type['class'] + d][jj, ii] = 1
+        # ten[pol_type['class'] + d][jj, ii] = 1
+        ten[pol_type['class'] + d][jj[0]:jj[-1]+1, ii[0]:ii[-1]+1] = 1
 
     return ten
 
