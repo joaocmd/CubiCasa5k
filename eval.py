@@ -9,7 +9,7 @@ from torch.utils import data
 from floortrans.models import get_model
 from floortrans.loaders import FloorplanSVG
 from floortrans.loaders.augmentations import DictToTensor, Compose
-from floortrans.metrics import get_evaluation_tensors, runningScore
+from floortrans.metrics import get_evaluation_tensors, pointScore, runningScore
 from tqdm import tqdm
 
 room_cls = ["Background", "Outdoor", "Wall", "Kitchen", "Living Room", "Bedroom", "Bath", "Hallway", "Railing", "Storage", "Garage", "Other rooms"]
@@ -24,9 +24,9 @@ def print_res(name, res, cls_names, logger):
     basic_values = name
     basic_res_list = ["Overall Acc", "Mean Acc", "Mean IoU", "FreqW Acc"]
     for key in basic_res_list:
-        basic_names += ' & ' + key
-        val = round(basic_res[key] * 100, 1)
-        basic_values += ' & ' + str(val)
+        basic_names += ',' + key
+        val = round(basic_res[key] * 100, 2)
+        basic_values += ',' + str(val)
 
     logger.info(basic_names)
     logger.info(basic_values)
@@ -36,10 +36,26 @@ def print_res(name, res, cls_names, logger):
     for i, name in enumerate(cls_names):
         iou = class_res['Class IoU'][str(i)]
         acc = class_res['Class Acc'][str(i)]
-        iou = round(iou * 100, 1)
-        acc = round(acc * 100, 1)
-        logger.info(name + " & " + str(iou) + " & " + str(acc) + " \\\\ \\hline")
+        iou = round(iou * 100, 2)
+        acc = round(acc * 100, 2)
+        logger.info(name + "," + str(iou) + "," + str(acc))
 
+def print_points(name, points, logger):
+    logger.info(name)
+    logger.info(f'Class,Precision,Recall') 
+    for i in range(len(points['Per_class']['Precision'])):
+        prec = points['Per_class']['Precision'][i]
+        recall = points['Per_class']['Recall'][i]
+        prec = round(prec*100, 2)
+        recall = round(recall*100, 2)
+        logger.info(f'{i},{prec},{recall}') 
+
+    prec = points['Overall']['Precision']
+    recall = points['Overall']['Recall']
+    prec = round(prec*100, 2)
+    recall = round(recall*100, 2)
+    logger.info(f'Overall,Precision,Recall') 
+    logger.info(f',{prec},{recall}') 
 
 def evaluate(args, log_dir, writer, logger):
 
@@ -61,13 +77,15 @@ def evaluate(args, log_dir, writer, logger):
     score_seg_icon = runningScore(11)
     score_pol_seg_room = runningScore(12)
     score_pol_seg_icon = runningScore(11)
+    score_wall_junctions = pointScore(list(range(13)))
+
     with torch.no_grad():
         for count, val in tqdm(enumerate(data_loader), total=len(data_loader),
                                ncols=80, leave=False):
             logger.info(count)
             things = get_evaluation_tensors(val, model, split, logger, rotate=True)
 
-            label, segmentation, pol_segmentation = things
+            label, segmentation, pol_segmentation, junctions, pred_junctions = things
 
             score_seg_room.update(label[0], segmentation[0])
             score_seg_icon.update(label[1], segmentation[1])
@@ -75,10 +93,17 @@ def evaluate(args, log_dir, writer, logger):
             score_pol_seg_room.update(label[0], pol_segmentation[0])
             score_pol_seg_icon.update(label[1], pol_segmentation[1])
 
+            score_wall_junctions.update(
+                {k: junctions[k] for k in junctions if k in range(13)},
+                {k: pred_junctions[k] for k in pred_junctions if k in range(13)},
+                distance_threshold=0.01*max(val['label'].shape[2], val['label'].shape[3]) # value from r2v
+            )
+
     print_res("Room segmentation", score_seg_room.get_scores(), room_cls, logger)
     print_res("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls, logger)
     print_res("Icon segmentation", score_seg_icon.get_scores(), icon_cls, logger)
     print_res("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls, logger)
+    print_points("Wall junctions", score_wall_junctions.get_scores(), logger)
 
 
 if __name__ == '__main__':

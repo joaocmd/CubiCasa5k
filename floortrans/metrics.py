@@ -2,7 +2,7 @@
 # https://github.com/wkentaro/pytorch-fcn/blob/master/torchfcn/utils.py
 # https://github.com/meetshah1995/pytorch-semseg/blob/master/ptsemseg/metrics.py
 
-from copy import deepcopy
+import copy
 import numpy as np
 import math
 import torch
@@ -12,6 +12,49 @@ from floortrans import post_prosessing
 from floortrans.loaders.augmentations import RotateNTurns
 from floortrans.plotting import shp_mask
 
+def sqrdistance(p, q):
+    return (p[0] - q[0])**2 + (p[1] - q[1])**2
+
+class pointScore:
+    def __init__(self, keys):
+        self.n_classes = len(keys)
+        self.scores = np.zeros((len(keys), 3), dtype=int)  # tp fp gt
+        # self.scores = {k: {'tp': 0, 'gt': 0, 'fp': 0} for k in keys}
+    
+    def update(self, gt, predicted, distance_threshold):
+        for k in range(self.n_classes):
+            pts_gt = [tuple(pt) for pt in gt[k]]
+            pts_pred = predicted[k][:]
+
+            self.scores[k][1] += len(pts_pred)
+            self.scores[k][2] += len(pts_gt)
+
+            if len(pts_gt) == 0:
+                continue
+
+            for pt in pts_pred:
+                p, distance = min([[p, sqrdistance(p, pt)] for p in pts_gt], key=lambda p: p[1])
+
+                if distance < distance_threshold:
+                    self.scores[k][0] += 1
+                    self.scores[k][1] -= 1
+                    pts_gt.remove(p)
+                    if len(pts_gt) == 0:
+                        break
+
+    def get_scores(self):
+        # tp fp gt
+        # acc = self.scores[:,0] / (self.scores[:,1] + self.scores[:,2])
+        recall = self.scores[:,0] / (self.scores[:,2])
+        precision = self.scores[:,0] / (self.scores[:,0] + self.scores[:,1])
+
+        # acc = np.sum(self.scores[:,0]) / (np.sum(self.scores[:,1]) + np.sum(self.scores[:,2]))
+        # acc = np.sum(self.scores[:,0]) / (np.sum(self.scores[:,2]))
+        avg_recall = np.mean(recall[~np.isnan(recall)])
+        avg_precision = np.mean(precision[~np.isnan(precision)])
+
+        return {'Per_class': {'Recall': recall, 'Precision': precision},
+                'Overall': {'Recall': avg_recall, 'Precision': avg_precision}}
 
 class runningScore(object):
     def __init__(self, n_classes):
@@ -130,9 +173,61 @@ def polygons_to_tensor(polygons_val, types_val, room_polygons_val, room_types_va
     return ten
 
 
+def extract_points(heatmaps, threshold = 0.2):
+    points = {}
+    for i in range(len(heatmaps)):
+        info = [int(i / 4), int(i % 4)]
+        p = extract_local_max(heatmaps[i], info, threshold, close_point_suppression=True)
+        points[i] = p
+    return points
+
+def extract_local_max(mask_img, info, heatmap_value_threshold=0.2,
+                      close_point_suppression=False, gap=10):
+    mask = copy.deepcopy(mask_img)
+    height, width = mask.shape
+    points = []
+
+    for i in range(1000): # HACK: should be while True
+        if i == 999:
+            print('extract_local_max: SHOULD NOT HAVE HAPPENED')
+
+        index = np.argmax(mask)
+        y, x = np.unravel_index(index, mask.shape)
+        max_value = mask[y, x]
+        if max_value <= heatmap_value_threshold:
+            return points
+
+        points.append([int(x), int(y)])
+
+        maximum_suppression(mask, x, y, heatmap_value_threshold)
+        if close_point_suppression:
+            mask[max(y - gap, 0):min(y + gap, height - 1),
+                 max(x - gap, 0):min(x + gap, width - 1)] = 0
+
+    return points
+
+def maximum_suppression(mask, x, y, heatmap_value_threshold):
+    height, width = mask.shape
+    value = mask[y][x]
+    mask[y][x] = -1
+    deltas = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    for delta in deltas:
+        neighbor_x = x + delta[0]
+        neighbor_y = y + delta[1]
+        if neighbor_x < 0 or neighbor_y < 0 or neighbor_x >= width or neighbor_y >= height:
+            continue
+        neighbor_value = mask[neighbor_y][neighbor_x]
+        if neighbor_value <= value and neighbor_value > heatmap_value_threshold:
+            maximum_suppression(mask, neighbor_x, neighbor_y,
+                               heatmap_value_threshold)
+            pass
+        continue
+
 def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44):
     images_val = val['image'].cuda()
     labels_val = val['label']
+    junctions_val = {i: [[int(x), int(y)] for x, y in v] for i, v in val['heatmaps'].items()}
+
     height = labels_val.shape[2]
     width = labels_val.shape[3]
     img_size = (height, width)
@@ -161,11 +256,10 @@ def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44)
     else:
         prediction = model(images_val)
 
-    heatmaps_val, rooms_val, icons_val = post_prosessing.split_validation(
-        labels_val, img_size, split)
     heatmaps, rooms, icons = post_prosessing.split_prediction(
         prediction, img_size, split)
-    
+
+    predicted_points = extract_points(heatmaps)
     rooms_seg = np.argmax(rooms, axis=0)
     icons_seg = np.argmax(icons, axis=0)
 
@@ -180,5 +274,8 @@ def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44)
     pol_rooms = np.argmax(predicted_classes[:split[1]], axis=0)
     pol_icons = np.argmax(predicted_classes[split[1]:], axis=0)
     
-    
-    return labels_val[0, 21:].data.numpy(), np.concatenate(([rooms_seg], [icons_seg]), axis=0), np.concatenate(([pol_rooms], [pol_icons]), axis=0)
+    return (labels_val[0, 21:].data.numpy(),
+            np.concatenate(([rooms_seg], [icons_seg]), axis=0),
+            np.concatenate(([pol_rooms], [pol_icons]), axis=0),
+            junctions_val,
+            predicted_points)

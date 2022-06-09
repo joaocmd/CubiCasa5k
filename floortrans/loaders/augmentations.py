@@ -165,7 +165,7 @@ class DictToTensor(object):
 
         label = torch.cat((heatmap_tensor, label), 0)
 
-        return {'image': image, 'label': label}
+        return {'image': image, 'label': label, 'heatmaps': heatmaps}
 
     def furukawa(self, sample):
         image, label = sample['image'], sample['label']

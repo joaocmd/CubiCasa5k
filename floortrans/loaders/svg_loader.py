@@ -84,6 +84,7 @@ class FloorplanSVG(Dataset):
 
         sample = {'image': img, 'label': label, 'folder': self.folders[index],
                   'heatmaps': heatmaps, 'scale': coef_width}
+        sample['heatmaps'] = {i: [[int(x), int(y)] for x, y in v] for i, v in sample['heatmaps'].items()}
 
         return sample
 
@@ -94,6 +95,8 @@ class FloorplanSVG(Dataset):
             data = f.get(key)
 
         sample = pickle.loads(data)
+        sample['heatmaps'] = {i: [[int(x), int(y)] for x, y in v] for i, v in sample['heatmaps'].items()}
+
         return sample
 
     def transform(self, sample):
