@@ -12,50 +12,6 @@ from floortrans import post_prosessing
 from floortrans.loaders.augmentations import RotateNTurns
 from floortrans.plotting import shp_mask
 
-def sqrdistance(p, q):
-    return (p[0] - q[0])**2 + (p[1] - q[1])**2
-
-class pointScore:
-    def __init__(self, keys):
-        self.n_classes = len(keys)
-        self.scores = np.zeros((len(keys), 3), dtype=int)  # tp fp gt
-        # self.scores = {k: {'tp': 0, 'gt': 0, 'fp': 0} for k in keys}
-    
-    def update(self, gt, predicted, distance_threshold):
-        for k in range(self.n_classes):
-            pts_gt = [tuple(pt) for pt in gt[k]]
-            pts_pred = predicted[k][:]
-
-            self.scores[k][1] += len(pts_pred)
-            self.scores[k][2] += len(pts_gt)
-
-            if len(pts_gt) == 0:
-                continue
-
-            for pt in pts_pred:
-                p, distance = min([[p, sqrdistance(p, pt)] for p in pts_gt], key=lambda p: p[1])
-
-                if distance < distance_threshold:
-                    self.scores[k][0] += 1
-                    self.scores[k][1] -= 1
-                    pts_gt.remove(p)
-                    if len(pts_gt) == 0:
-                        break
-
-    def get_scores(self):
-        # tp fp gt
-        # acc = self.scores[:,0] / (self.scores[:,1] + self.scores[:,2])
-        recall = self.scores[:,0] / (self.scores[:,2])
-        precision = self.scores[:,0] / (self.scores[:,0] + self.scores[:,1])
-
-        # acc = np.sum(self.scores[:,0]) / (np.sum(self.scores[:,1]) + np.sum(self.scores[:,2]))
-        # acc = np.sum(self.scores[:,0]) / (np.sum(self.scores[:,2]))
-        avg_recall = np.mean(recall[~np.isnan(recall)])
-        avg_precision = np.mean(precision[~np.isnan(precision)])
-
-        return {'Per_class': {'Recall': recall, 'Precision': precision},
-                'Overall': {'Recall': avg_recall, 'Precision': avg_precision}}
-
 class runningScore(object):
     def __init__(self, n_classes):
         self.n_classes = n_classes
@@ -173,12 +129,15 @@ def polygons_to_tensor(polygons_val, types_val, room_polygons_val, room_types_va
     return ten
 
 
-def extract_points(heatmaps, threshold = 0.2):
+def extract_points(heatmaps, threshold = 0.09):
     points = {}
     for i in range(len(heatmaps)):
-        info = [int(i / 4), int(i % 4)]
+        # info = [int(i / 4), int(i % 4)]
+        info = i
         p = extract_local_max(heatmaps[i], info, threshold, close_point_suppression=True)
         points[i] = p
+
+    points[-1] = extract_local_max(np.sum(heatmaps[:13], axis=0), -1, 0.2, close_point_suppression=True)
     return points
 
 def extract_local_max(mask_img, info, heatmap_value_threshold=0.2,
@@ -194,10 +153,10 @@ def extract_local_max(mask_img, info, heatmap_value_threshold=0.2,
         index = np.argmax(mask)
         y, x = np.unravel_index(index, mask.shape)
         max_value = mask[y, x]
-        if max_value <= heatmap_value_threshold:
+        if max_value < heatmap_value_threshold:
             return points
 
-        points.append([int(x), int(y)])
+        points.append([int(x), int(y)] + [info, max_value])
 
         maximum_suppression(mask, x, y, heatmap_value_threshold)
         if close_point_suppression:
@@ -250,7 +209,7 @@ def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44)
             pred = interpolate(pred, size=(height, width), mode='bilinear', align_corners=True)
             # We add the prediction to output
             prediction[i] = pred[0]
-            logger.info("flip: " + str(i))
+            # logger.info("flip: " + str(i))
 
         prediction = torch.mean(prediction, 0, True)
     else:

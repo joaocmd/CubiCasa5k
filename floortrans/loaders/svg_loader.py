@@ -91,10 +91,10 @@ class FloorplanSVG(Dataset):
     def get_lmdb(self, index):
         key = self.folders[index].encode()
         with self.lmdb.begin(write=False) as f:
-            print(key)
             data = f.get(key)
 
         sample = pickle.loads(data)
+        sample['folder'] = key
         sample['heatmaps'] = {i: [[int(x), int(y)] for x, y in v] for i, v in sample['heatmaps'].items()}
 
         return sample

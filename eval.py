@@ -1,5 +1,4 @@
 import numpy as np
-# from tensorboardX import SummaryWriter
 import os
 import logging
 import argparse
@@ -9,7 +8,8 @@ from torch.utils import data
 from floortrans.models import get_model
 from floortrans.loaders import FloorplanSVG
 from floortrans.loaders.augmentations import DictToTensor, Compose
-from floortrans.metrics import get_evaluation_tensors, pointScore, runningScore
+from floortrans.metrics import get_evaluation_tensors, runningScore
+from floortrans.metrics_points import pointScoreNoClass, pointScorePerClass, pointScoreMixed
 from tqdm import tqdm
 
 room_cls = ["Background", "Outdoor", "Wall", "Kitchen", "Living Room", "Bedroom", "Bath", "Hallway", "Railing", "Storage", "Garage", "Other rooms"]
@@ -40,24 +40,47 @@ def print_res(name, res, cls_names, logger):
         acc = round(acc * 100, 2)
         logger.info(name + "," + str(iou) + "," + str(acc))
 
-def print_points(name, points, logger):
-    logger.info(name)
-    logger.info(f'Class,Precision,Recall') 
-    for i in range(len(points['Per_class']['Precision'])):
-        prec = points['Per_class']['Precision'][i]
-        recall = points['Per_class']['Recall'][i]
+def print_points_per_class(name, points, logger):
+    logger.info('\n' + name)
+    for t, v in points.items():
+        logger.info(f'\nthreshold: {t}')
+        logger.info(f'Class,Precision,Recall')
+        for i in range(len(v['Per_class']['Precision'])):
+            prec = v['Per_class']['Precision'][i]
+            recall = v['Per_class']['Recall'][i]
+            prec = round(prec*100, 2)
+            recall = round(recall*100, 2)
+            logger.info(f'{i},{prec},{recall}')
+
+        prec = v['Overall']['Precision']
+        recall = v['Overall']['Recall']
         prec = round(prec*100, 2)
         recall = round(recall*100, 2)
-        logger.info(f'{i},{prec},{recall}') 
+        logger.info(f'Overall,Precision,Recall')
+        logger.info(f',{prec},{recall}')
 
-    prec = points['Overall']['Precision']
-    recall = points['Overall']['Recall']
-    prec = round(prec*100, 2)
-    recall = round(recall*100, 2)
-    logger.info(f'Overall,Precision,Recall') 
-    logger.info(f',{prec},{recall}') 
+def print_points_mixed(name, points, logger):
+    logger.info('\n' + name)
+    for t, v in points.items():
+        logger.info(f'\nthreshold: {t}')
+        logger.info('class')
+        for row in [*range(len(v) - 1), -1]:
+            logger.info(','.join(map(str, [row, *v[row]])))
 
-def evaluate(args, log_dir, writer, logger):
+        logger.info(','.join(['class', *map(str, range(len(v) - 1)), '-1']))
+
+def print_points_no_class(name, points, logger):
+    logger.info('\n' + name)
+    for t, v in points.items():
+        logger.info(f'\nthreshold: {t}')
+        prec = v['Precision']
+        recall = v['Recall']
+        prec = round(prec*100, 2)
+        recall = round(recall*100, 2)
+        logger.info(f'Precision,Recall')
+        logger.info(f'{prec},{recall}')
+
+def evaluate(args, log_dir, logger):
 
     normal_set = FloorplanSVG(args.data_path, 'test.txt', format='lmdb', lmdb_folder='cubi_lmdb/', augmentations=Compose([DictToTensor()]))
     data_loader = data.DataLoader(normal_set, batch_size=1, num_workers=0)
@@ -77,12 +100,14 @@ def evaluate(args, log_dir, writer, logger):
     score_seg_icon = runningScore(11)
     score_pol_seg_room = runningScore(12)
     score_pol_seg_icon = runningScore(11)
-    score_wall_junctions = pointScore(list(range(13)))
+    score_junctions_per_class = pointScorePerClass(list(range(13)))
+    score_junctions_mixed = pointScoreMixed(13)
+    score_junctions_no_class = pointScoreNoClass()
 
     with torch.no_grad():
         for count, val in tqdm(enumerate(data_loader), total=len(data_loader),
                                ncols=80, leave=False):
-            logger.info(count)
+            logger.info(f'{count} - {val["folder"]}')
             things = get_evaluation_tensors(val, model, split, logger, rotate=True)
 
             label, segmentation, pol_segmentation, junctions, pred_junctions = things
@@ -93,17 +118,21 @@ def evaluate(args, log_dir, writer, logger):
             score_pol_seg_room.update(label[0], pol_segmentation[0])
             score_pol_seg_icon.update(label[1], pol_segmentation[1])
 
-            score_wall_junctions.update(
-                {k: junctions[k] for k in junctions if k in range(13)},
-                {k: pred_junctions[k] for k in pred_junctions if k in range(13)},
-                distance_threshold=0.01*max(val['label'].shape[2], val['label'].shape[3]) # value from r2v
-            )
+            junctions_gt = {k: junctions[k] for k in junctions if k in range(-1, 13)}
+            junctions_pred = {k: pred_junctions[k] for k in pred_junctions if k in range(-1, 13)}
+            distance_threshold=0.01*max(val['label'].shape[2], val['label'].shape[3]) # value from r2v
+
+            score_junctions_per_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
+            score_junctions_mixed.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
+            score_junctions_no_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
 
     print_res("Room segmentation", score_seg_room.get_scores(), room_cls, logger)
     print_res("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls, logger)
     print_res("Icon segmentation", score_seg_icon.get_scores(), icon_cls, logger)
     print_res("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls, logger)
-    print_points("Wall junctions", score_wall_junctions.get_scores(), logger)
+    print_points_per_class("Wall junctions per class", score_junctions_per_class.get_scores(), logger)
+    print_points_mixed("Wall junctions mixed", score_junctions_mixed.get_scores(), logger)
+    print_points_no_class("Wall junctions no class", score_junctions_no_class.get_scores(), logger)
 
 
 if __name__ == '__main__':
@@ -123,14 +152,16 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     log_dir = args.log_path + '/' + time_stamp + '/'
-    writer = None #SummaryWriter(log_dir)
     os.mkdir(log_dir)
     logger = logging.getLogger('eval')
     logger.setLevel(logging.DEBUG)
     fh = logging.FileHandler(log_dir+'/eval.log')
     fh.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(message)s')
     fh.setFormatter(formatter)
     logger.addHandler(fh)
 
-    evaluate(args, log_dir, writer, logger)
+    logger.info(f'Start: {time_stamp}')
+    evaluate(args, log_dir, logger)
+    time_stamp = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
+    logger.info(f'End: {time_stamp}')
