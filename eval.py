@@ -16,6 +16,22 @@ room_cls = ["Background", "Outdoor", "Wall", "Kitchen", "Living Room", "Bedroom"
 icon_cls = ["Empty", "Window", "Door", "Closet", "Electr. Appl.", "Toilet", "Sink", "Sauna bench", "Fire Place", "Bathtub", "Chimney"]
 
 
+def res_to_csv(name, res, cls_names):
+    raise NotImplementedError
+
+
+def points_per_class_to_csv(name, res, cls_names):
+    raise NotImplementedError
+
+
+def points_mixed_to_csv(name, res, cls_names):
+    raise NotImplementedError
+
+
+def points_no_class_to_csv(name, res, cls_names):
+    raise NotImplementedError
+
+
 def print_res(name, res, cls_names, logger):
     basic_res = res[0]
     class_res = res[1]
