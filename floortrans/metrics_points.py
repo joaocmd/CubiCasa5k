@@ -61,6 +61,7 @@ class pointScoreNoClass:
 
 class pointScorePerClass:
     def __init__(self, keys):
+        self.classes = keys
         self.n_classes = len(keys)
         self.scores = {t: np.zeros((len(keys), 3), dtype=int) for t in range(0, 101, 10)} # tp fp gt
 

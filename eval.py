@@ -14,19 +14,13 @@ from floortrans.loaders.augmentations import DictToTensor, Compose
 from floortrans.metrics import get_evaluation_tensors, runningScore
 from floortrans.metrics_points import pointScoreNoClass, pointScorePerClass, pointScoreMixed
 from tqdm import tqdm
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 room_cls = ["Background", "Outdoor", "Wall", "Kitchen", "Living Room", "Bedroom", "Bath", "Hallway", "Railing", "Storage", "Garage", "Other rooms"]
 icon_cls = ["Empty", "Window", "Door", "Closet", "Electr. Appl.", "Toilet", "Sink", "Sauna bench", "Fire Place", "Bathtub", "Chimney"]
 
 
 def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
-
-    # (name, res, cls_names: List[str]), where
-    # - `name` is the descriptive name of the segmentation
-    # - `res` is a 2-dim tuple with the following format:
-    #    {"Overall Acc": v1, "Mean Acc": v2, "FreqW Acc": v3, "Mean IoU": v4 },
-    #    { "Class IoU": Dict[str, float], "Class Acc": Dict[str, float] },
     # -----------------------------------------------------------------
     # 1. Create file with overall results of segmentation
     # -----------------------------------------------------------------
@@ -40,7 +34,7 @@ def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
             global_results[metric].append(metric_value)
 
     # Dump to file
-    pd.DataFrame(global_results).to_csv(f"{parent_dir}/{filename}_global.csv")
+    pd.DataFrame(global_results).to_csv(f"{parent_dir}/{filename}_global.csv", index=False)
 
     # -----------------------------------------------------------------
     # 2. Create file with segmentation results discriminated by class
@@ -62,46 +56,59 @@ def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
                 class_val = round(class_val*100, 2)
                 class_results[class_metric].append(class_val)
 
-    for k, v in class_results.items():
-        print(k, len(v))
     # Dump to file
-    pd.DataFrame(class_results).to_csv(f"{parent_dir}/{filename}_by_class.csv")
+    pd.DataFrame(class_results).to_csv(f"{parent_dir}/{filename}_by_class.csv", index=False)
 
-def points_per_class_to_csv(name, res, cls_names):
+
+def points_per_class_to_csv(
+        points: Dict[int, dict],
+        class_names: List[str],
+        filename: str,
+        parent_dir: str=".",
+    ):
+
+    results = defaultdict(list)
+
+    for threshold, metric_values in points.items():
+        # metric_values = {
+        #   'Per_class': {'Recall': recall, 'Precision': precision}, 
+        #   'Overall': {'Recall': avg_recall, 'Precision': avg_precision}
+        # }
+
+        # ------------------------------------------------------------
+        # 1. Process overall metrics first
+        # ------------------------------------------------------------
+        results["threshold"].append(threshold)
+        results["class"].append("overall")
+
+        for metric, overall_value in metric_values["Overall"].items():
+            overall_value = round(overall_value * 100, 2)
+            results[metric].append(overall_value)
+
+        # 2. Process per class
+        per_class_metrics = metric_values["Per_class"]
+        for i, class_name in enumerate(class_names):
+            results["threshold"].append(threshold)
+            results["class"].append(class_name)
+            # metric will be either "Recall" or "Precision"
+            # Using a for loop ensures that if we aim to extend metrics
+            # with additional metrics, this script will work the same :)
+            class_values = per_class_metrics[metric]
+
+            for metric, class_values in per_class_metrics.items():
+                class_value = class_values[i]
+                class_value = round(class_value * 100, 2)
+                results[metric].append(class_value)
+
+        pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
+
+def points_mixed_to_csv(name, points, cls_names):
     raise NotImplementedError
 
 
-def points_mixed_to_csv(name, res, cls_names):
+def points_no_class_to_csv(name, points, cls_names):
     raise NotImplementedError
 
-
-def points_no_class_to_csv(name, res, cls_names):
-    raise NotImplementedError
-
-
-def print_res(name, res, cls_names, logger):
-    basic_res = res[0]
-    class_res = res[1]
-
-    basic_names = ''
-    basic_values = name
-    basic_res_list = ["Overall Acc", "Mean Acc", "Mean IoU", "FreqW Acc"]
-    for key in basic_res_list:
-        basic_names += ',' + key
-        val = round(basic_res[key] * 100, 2)
-        basic_values += ',' + str(val)
-
-    logger.info(basic_names)
-    logger.info(basic_values)
-
-    basic_res_list = ["IoU", "Acc"]
-    logger.info("IoU & Acc")
-    for i, name in enumerate(cls_names):
-        iou = class_res['Class IoU'][str(i)]
-        acc = class_res['Class Acc'][str(i)]
-        iou = round(iou * 100, 2)
-        acc = round(acc * 100, 2)
-        logger.info(name + "," + str(iou) + "," + str(acc))
 
 def print_points_per_class(name, points, logger):
     logger.info('\n' + name)
@@ -204,14 +211,19 @@ def evaluate(args, log_dir, logger):
         ("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls),
     )
     res_to_csv(segmentation_data, filename="segmentation", parent_dir=".")
-    raise NotImplemented
-    print_res("Room segmentation", score_seg_room.get_scores(), room_cls, logger)
-    print_res("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls, logger)
-    print_res("Icon segmentation", score_seg_icon.get_scores(), icon_cls, logger)
-    print_res("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls, logger)
-    print_points_per_class("Wall junctions per class", score_junctions_per_class.get_scores(), logger)
+
+    points_per_class_to_csv(
+        points=score_junctions_per_class.get_scores(),
+        class_names=score_junctions_per_class.classes,
+        filename="wall_junctions_per_class",
+        parent_dir=".",
+    )
+    
     print_points_mixed("Wall junctions mixed", score_junctions_mixed.get_scores(), logger)
+    raise NotImplemented
+
     print_points_no_class("Wall junctions no class", score_junctions_no_class.get_scores(), logger)
+    raise NotImplemented
 
 
 if __name__ == '__main__':
