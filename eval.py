@@ -1,4 +1,7 @@
+from collections import defaultdict
+
 import numpy as np
+import pandas as pd
 import os
 import logging
 import argparse
@@ -11,14 +14,58 @@ from floortrans.loaders.augmentations import DictToTensor, Compose
 from floortrans.metrics import get_evaluation_tensors, runningScore
 from floortrans.metrics_points import pointScoreNoClass, pointScorePerClass, pointScoreMixed
 from tqdm import tqdm
+from typing import List, Tuple
 
 room_cls = ["Background", "Outdoor", "Wall", "Kitchen", "Living Room", "Bedroom", "Bath", "Hallway", "Railing", "Storage", "Garage", "Other rooms"]
 icon_cls = ["Empty", "Window", "Door", "Closet", "Electr. Appl.", "Toilet", "Sink", "Sauna bench", "Fire Place", "Bathtub", "Chimney"]
 
 
-def res_to_csv(name, res, cls_names):
-    raise NotImplementedError
+def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
 
+    # (name, res, cls_names: List[str]), where
+    # - `name` is the descriptive name of the segmentation
+    # - `res` is a 2-dim tuple with the following format:
+    #    {"Overall Acc": v1, "Mean Acc": v2, "FreqW Acc": v3, "Mean IoU": v4 },
+    #    { "Class IoU": Dict[str, float], "Class Acc": Dict[str, float] },
+    # -----------------------------------------------------------------
+    # 1. Create file with overall results of segmentation
+    # -----------------------------------------------------------------
+    global_results = defaultdict(list)
+    for name, res, _ in data:
+        global_results["name"].append(name)
+
+        # first element in the ``res`` tuple contains the overall results
+        global_res = res[0]
+        for metric, metric_value in global_res.items():
+            global_results[metric].append(metric_value)
+
+    # Dump to file
+    pd.DataFrame(global_results).to_csv(f"{parent_dir}/{filename}_global.csv")
+
+    # -----------------------------------------------------------------
+    # 2. Create file with segmentation results discriminated by class
+    # -----------------------------------------------------------------
+    class_results = defaultdict(list)
+
+    for name, res, class_names in data:
+        # second element in the ``res`` tuple contains the class results
+        class_res = res[1]
+        class_results["name"].extend([name] * len(class_names))
+        class_results["class_names"].extend(class_names)
+
+        for class_metric, class_values in class_res.items():
+            for i in range(len(class_names)):
+                # Note: class_values constitute a dictionary where
+                # keys are text index representation of class_names
+                # and values are the corresponding metric value.
+                class_val = class_values[str(i)]
+                class_val = round(class_val*100, 2)
+                class_results[class_metric].append(class_val)
+
+    for k, v in class_results.items():
+        print(k, len(v))
+    # Dump to file
+    pd.DataFrame(class_results).to_csv(f"{parent_dir}/{filename}_by_class.csv")
 
 def points_per_class_to_csv(name, res, cls_names):
     raise NotImplementedError
@@ -141,7 +188,23 @@ def evaluate(args, log_dir, logger):
             score_junctions_per_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
             score_junctions_mixed.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
             score_junctions_no_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
-
+            if count > 5:
+                break
+    # Note: Segmentation data is organized as tuples of:
+    # (name, res, cls_names: List[str]), where
+    # - `name` is the descriptive name of the segmentation
+    # - `res` is a 2-dim tuple with the following format:
+    #    {"Overall Acc": v1, "Mean Acc": v2, "FreqW Acc": v3, "Mean IoU": v4},
+    #    { "Class IoU": List[values], "Class Acc": List[values], }
+    # 
+    segmentation_data = (
+        ("Room segmentation", score_seg_room.get_scores(), room_cls), 
+        ("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls), 
+        ("Icon segmentation", score_seg_icon.get_scores(), icon_cls), 
+        ("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls),
+    )
+    res_to_csv(segmentation_data, filename="segmentation", parent_dir=".")
+    raise NotImplemented
     print_res("Room segmentation", score_seg_room.get_scores(), room_cls, logger)
     print_res("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls, logger)
     print_res("Icon segmentation", score_seg_icon.get_scores(), icon_cls, logger)
