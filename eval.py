@@ -21,6 +21,35 @@ icon_cls = ["Empty", "Window", "Door", "Closet", "Electr. Appl.", "Toilet", "Sin
 
 
 def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
+    """Dump segmentation results to CSV files.
+    
+    It creates two different files at the specified ``parent_dir`` under
+    the provided ``filename`` and with suffixes ``_by_class`` or 
+    ``_global``, depending on whether it represents the overall results
+    of the segmentation or it refers to the results discriminated by class.
+
+    Parameters
+    ----------
+    data: Tuple[name: str, results: Dict, class_names: List[str]]
+        The data structure to dump to the CSV file. It consists of three
+        components: (1) name is the descriptive name of the result being
+        dumped in the file; (2) results if a 2 dimensional tuple of the
+        overall metrics and the metrics discriminated by class;
+        (3) class_names is an iterable consisting of the classes names
+        and whose indices match the indices in the second component of
+        results.
+        results = (
+            {"Overall Acc": float, "Mean Acc": float, "FreqW Acc": float, "Mean IoU": float},
+            { "Class IoU": Dict[str, float], "Class Acc": Dict[str, float]}
+        )
+
+    filename: str
+        Base name of the files being created. It is suffixed with the
+        appropriate file extension.
+
+    parent_dir: str, defaults to current directory
+        The directory to write the file onto.
+    """
     # -----------------------------------------------------------------
     # 1. Create file with overall results of segmentation
     # -----------------------------------------------------------------
@@ -102,6 +131,7 @@ def points_per_class_to_csv(
 
         pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
 
+
 def points_mixed_to_csv(
     points: Dict[int, dict],
     class_names: List[str], 
@@ -123,49 +153,18 @@ def points_mixed_to_csv(
     pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
 
 
-def points_no_class_to_csv(name, points, cls_names):
-    raise NotImplementedError
+def points_no_class_to_csv(points, filename: str, parent_dir: str="."):
+    results = defaultdict(list)
 
+    for threshold, metric_values in points.items():
+        results["threshold"].append(threshold)
 
-def print_points_per_class(name, points, logger):
-    logger.info('\n' + name)
-    for t, v in points.items():
-        logger.info(f'\nthreshold: {t}')
-        logger.info(f'Class,Precision,Recall')
-        for i in range(len(v['Per_class']['Precision'])):
-            prec = v['Per_class']['Precision'][i]
-            recall = v['Per_class']['Recall'][i]
-            prec = round(prec*100, 2)
-            recall = round(recall*100, 2)
-            logger.info(f'{i},{prec},{recall}')
+        for metric_name, metric_val in metric_values.items():
+            metric_val = round(metric_val * 100, 2)
+            results[metric_name].append(metric_val)
 
-        prec = v['Overall']['Precision']
-        recall = v['Overall']['Recall']
-        prec = round(prec*100, 2)
-        recall = round(recall*100, 2)
-        logger.info(f'Overall,Precision,Recall')
-        logger.info(f',{prec},{recall}')
+    pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
 
-def print_points_mixed(name, points, logger):
-    logger.info('\n' + name)
-    for t, v in points.items():
-        logger.info(f'\nthreshold: {t}')
-        logger.info('class')
-        for row in [*range(len(v) - 1), -1]:
-            logger.info(','.join(map(str, [row, *v[row]])))
-
-        logger.info(','.join(['class', *map(str, range(len(v) - 1)), '-1']))
-
-def print_points_no_class(name, points, logger):
-    logger.info('\n' + name)
-    for t, v in points.items():
-        logger.info(f'\nthreshold: {t}')
-        prec = v['Precision']
-        recall = v['Recall']
-        prec = round(prec*100, 2)
-        recall = round(recall*100, 2)
-        logger.info(f'Precision,Recall')
-        logger.info(f'{prec},{recall}')
 
 def evaluate(args, log_dir, logger):
 
@@ -212,8 +211,6 @@ def evaluate(args, log_dir, logger):
             score_junctions_per_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
             score_junctions_mixed.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
             score_junctions_no_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
-            if count > 5:
-                break
 
 
     csv_kwargs = {"parent_dir": "."}
@@ -248,7 +245,6 @@ def evaluate(args, log_dir, logger):
 
     points_no_class_to_csv(
         points=score_junctions_no_class.get_scores(),
-        class_names=score_junctions_no_class.classes,
         filename="wall_junctions_no_class", 
         **csv_kwargs,
     )
