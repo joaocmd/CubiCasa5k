@@ -1,4 +1,7 @@
+from collections import defaultdict
+
 import numpy as np
+import pandas as pd
 import os
 import logging
 import argparse
@@ -11,74 +14,157 @@ from floortrans.loaders.augmentations import DictToTensor, Compose
 from floortrans.metrics import get_evaluation_tensors, runningScore
 from floortrans.metrics_points import pointScoreNoClass, pointScorePerClass, pointScoreMixed
 from tqdm import tqdm
+from typing import Dict, List, Tuple
 
 room_cls = ["Background", "Outdoor", "Wall", "Kitchen", "Living Room", "Bedroom", "Bath", "Hallway", "Railing", "Storage", "Garage", "Other rooms"]
 icon_cls = ["Empty", "Window", "Door", "Closet", "Electr. Appl.", "Toilet", "Sink", "Sauna bench", "Fire Place", "Bathtub", "Chimney"]
 
 
-def print_res(name, res, cls_names, logger):
-    basic_res = res[0]
-    class_res = res[1]
+def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
+    """Dump segmentation results to CSV files.
+    
+    It creates two different files at the specified ``parent_dir`` under
+    the provided ``filename`` and with suffixes ``_by_class`` or 
+    ``_global``, depending on whether it represents the overall results
+    of the segmentation or it refers to the results discriminated by class.
 
-    basic_names = ''
-    basic_values = name
-    basic_res_list = ["Overall Acc", "Mean Acc", "Mean IoU", "FreqW Acc"]
-    for key in basic_res_list:
-        basic_names += ',' + key
-        val = round(basic_res[key] * 100, 2)
-        basic_values += ',' + str(val)
+    Parameters
+    ----------
+    data: Tuple[name: str, results: Dict, class_names: List[str]]
+        The data structure to dump to the CSV file. It consists of three
+        components: (1) name is the descriptive name of the result being
+        dumped in the file; (2) results if a 2 dimensional tuple of the
+        overall metrics and the metrics discriminated by class;
+        (3) class_names is an iterable consisting of the classes names
+        and whose indices match the indices in the second component of
+        results.
+        results = (
+            {"Overall Acc": float, "Mean Acc": float, "FreqW Acc": float, "Mean IoU": float},
+            { "Class IoU": Dict[str, float], "Class Acc": Dict[str, float]}
+        )
 
-    logger.info(basic_names)
-    logger.info(basic_values)
+    filename: str
+        Base name of the files being created. It is suffixed with the
+        appropriate file extension.
 
-    basic_res_list = ["IoU", "Acc"]
-    logger.info("IoU & Acc")
-    for i, name in enumerate(cls_names):
-        iou = class_res['Class IoU'][str(i)]
-        acc = class_res['Class Acc'][str(i)]
-        iou = round(iou * 100, 2)
-        acc = round(acc * 100, 2)
-        logger.info(name + "," + str(iou) + "," + str(acc))
+    parent_dir: str, defaults to current directory
+        The directory to write the file onto.
+    """
+    # -----------------------------------------------------------------
+    # 1. Create file with overall results of segmentation
+    # -----------------------------------------------------------------
+    global_results = defaultdict(list)
+    for name, res, _ in data:
+        global_results["name"].append(name)
 
-def print_points_per_class(name, points, logger):
-    logger.info('\n' + name)
-    for t, v in points.items():
-        logger.info(f'\nthreshold: {t}')
-        logger.info(f'Class,Precision,Recall')
-        for i in range(len(v['Per_class']['Precision'])):
-            prec = v['Per_class']['Precision'][i]
-            recall = v['Per_class']['Recall'][i]
-            prec = round(prec*100, 2)
-            recall = round(recall*100, 2)
-            logger.info(f'{i},{prec},{recall}')
+        # first element in the ``res`` tuple contains the overall results
+        global_res = res[0]
+        for metric, metric_value in global_res.items():
+            global_results[metric].append(metric_value)
 
-        prec = v['Overall']['Precision']
-        recall = v['Overall']['Recall']
-        prec = round(prec*100, 2)
-        recall = round(recall*100, 2)
-        logger.info(f'Overall,Precision,Recall')
-        logger.info(f',{prec},{recall}')
+    # Dump to file
+    pd.DataFrame(global_results).to_csv(f"{parent_dir}/{filename}_global.csv", index=False)
 
-def print_points_mixed(name, points, logger):
-    logger.info('\n' + name)
-    for t, v in points.items():
-        logger.info(f'\nthreshold: {t}')
-        logger.info('class')
-        for row in [*range(len(v) - 1), -1]:
-            logger.info(','.join(map(str, [row, *v[row]])))
+    # -----------------------------------------------------------------
+    # 2. Create file with segmentation results discriminated by class
+    # -----------------------------------------------------------------
+    class_results = defaultdict(list)
 
-        logger.info(','.join(['class', *map(str, range(len(v) - 1)), '-1']))
+    for name, res, class_names in data:
+        # second element in the ``res`` tuple contains the class results
+        class_res = res[1]
+        class_results["name"].extend([name] * len(class_names))
+        class_results["class_names"].extend(class_names)
 
-def print_points_no_class(name, points, logger):
-    logger.info('\n' + name)
-    for t, v in points.items():
-        logger.info(f'\nthreshold: {t}')
-        prec = v['Precision']
-        recall = v['Recall']
-        prec = round(prec*100, 2)
-        recall = round(recall*100, 2)
-        logger.info(f'Precision,Recall')
-        logger.info(f'{prec},{recall}')
+        for class_metric, class_values in class_res.items():
+            for i in range(len(class_names)):
+                # Note: class_values constitute a dictionary where
+                # keys are text index representation of class_names
+                # and values are the corresponding metric value.
+                class_val = class_values[str(i)]
+                class_val = round(class_val*100, 2)
+                class_results[class_metric].append(class_val)
+
+    # Dump to file
+    pd.DataFrame(class_results).to_csv(f"{parent_dir}/{filename}_by_class.csv", index=False)
+
+
+def points_per_class_to_csv(
+        points: Dict[int, dict],
+        class_names: List[str],
+        filename: str,
+        parent_dir: str=".",
+    ):
+
+    results = defaultdict(list)
+
+    for threshold, metric_values in points.items():
+        # metric_values = {
+        #   'Per_class': {'Recall': recall, 'Precision': precision}, 
+        #   'Overall': {'Recall': avg_recall, 'Precision': avg_precision}
+        # }
+
+        # ------------------------------------------------------------
+        # 1. Process overall metrics first
+        # ------------------------------------------------------------
+        results["threshold"].append(threshold)
+        results["class"].append("overall")
+
+        for metric, overall_value in metric_values["Overall"].items():
+            overall_value = round(overall_value * 100, 2)
+            results[metric].append(overall_value)
+
+        # 2. Process per class
+        per_class_metrics = metric_values["Per_class"]
+        for i, class_name in enumerate(class_names):
+            results["threshold"].append(threshold)
+            results["class"].append(class_name)
+            # metric will be either "Recall" or "Precision"
+            # Using a for loop ensures that if we aim to extend metrics
+            # with additional metrics, this script will work the same :)
+            class_values = per_class_metrics[metric]
+
+            for metric, class_values in per_class_metrics.items():
+                class_value = class_values[i]
+                class_value = round(class_value * 100, 2)
+                results[metric].append(class_value)
+
+        pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
+
+
+def points_mixed_to_csv(
+    points: Dict[int, dict],
+    class_names: List[str], 
+    filename: str,
+    parent_dir: str=".",
+):
+    results = defaultdict(list)
+
+    for threshold, metric_values in points.items():
+        for i, class_name in enumerate(class_names):
+            # Class name
+            results["class"].append(class_name)
+            results["threshold"].append(threshold)
+
+            # Confusion matrix for the specified class
+            for j, cls in enumerate(class_names):
+                results[cls].append(metric_values[i, j])
+
+    pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
+
+
+def points_no_class_to_csv(points, filename: str, parent_dir: str="."):
+    results = defaultdict(list)
+
+    for threshold, metric_values in points.items():
+        results["threshold"].append(threshold)
+
+        for metric_name, metric_val in metric_values.items():
+            metric_val = round(metric_val * 100, 2)
+            results[metric_name].append(metric_val)
+
+    pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
+
 
 def evaluate(args, log_dir, logger):
 
@@ -126,14 +212,42 @@ def evaluate(args, log_dir, logger):
             score_junctions_mixed.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
             score_junctions_no_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
 
-    print_res("Room segmentation", score_seg_room.get_scores(), room_cls, logger)
-    print_res("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls, logger)
-    print_res("Icon segmentation", score_seg_icon.get_scores(), icon_cls, logger)
-    print_res("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls, logger)
-    print_points_per_class("Wall junctions per class", score_junctions_per_class.get_scores(), logger)
-    print_points_mixed("Wall junctions mixed", score_junctions_mixed.get_scores(), logger)
-    print_points_no_class("Wall junctions no class", score_junctions_no_class.get_scores(), logger)
 
+    csv_kwargs = {"parent_dir": "./outputs/results"}
+    # Note: Segmentation data is organized as tuples of:
+    # (name, res, cls_names: List[str]), where
+    # - `name` is the descriptive name of the segmentation
+    # - `res` is a 2-dim tuple with the following format:
+    #    {"Overall Acc": v1, "Mean Acc": v2, "FreqW Acc": v3, "Mean IoU": v4},
+    #    { "Class IoU": List[values], "Class Acc": List[values], }
+    # 
+    segmentation_data = (
+        ("Room segmentation", score_seg_room.get_scores(), room_cls), 
+        ("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls), 
+        ("Icon segmentation", score_seg_icon.get_scores(), icon_cls), 
+        ("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls),
+    )
+    res_to_csv(segmentation_data, filename="segmentation", **csv_kwargs)
+
+    points_per_class_to_csv(
+        points=score_junctions_per_class.get_scores(),
+        class_names=score_junctions_per_class.classes,
+        filename="wall_junctions_per_class",
+        **csv_kwargs
+    )
+    
+    points_mixed_to_csv(
+        points=score_junctions_mixed.get_scores(),
+        class_names=score_junctions_mixed.classes,
+        filename="wall_junctions_mixed",
+        **csv_kwargs
+    )
+
+    points_no_class_to_csv(
+        points=score_junctions_no_class.get_scores(),
+        filename="wall_junctions_no_class", 
+        **csv_kwargs,
+    )
 
 if __name__ == '__main__':
     time_stamp = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
