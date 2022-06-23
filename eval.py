@@ -213,7 +213,7 @@ def evaluate(args, log_dir, logger):
             score_junctions_no_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
 
 
-    csv_kwargs = {"parent_dir": "."}
+    csv_kwargs = {"parent_dir": "./outputs/results"}
     # Note: Segmentation data is organized as tuples of:
     # (name, res, cls_names: List[str]), where
     # - `name` is the descriptive name of the segmentation
