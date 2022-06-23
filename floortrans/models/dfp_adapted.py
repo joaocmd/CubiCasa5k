@@ -156,6 +156,15 @@ class DFPmodel(torch.nn.Module):
         # 11 icon classes
         # icon_classes = ["No Icon", "Window", "Door", "Closet", "Electrical Appliance" ,"Toilet", "Sink", "Sauna Bench", "Fire Place", "Bathtub", "Chimney"]
 
+        N, C, H, W = x.shape
+
+        if H%2 == 1 and  W%2 == 1:
+            x = F.pad(x, (1, 0, 1, 0), mode='replicate')
+        elif H%2 == 1:
+            x = F.pad(x, (0, 0, 1, 0), mode='replicate')
+        elif W%2 == 1:
+            x = F.pad(x, (1, 0), mode='replicate')
+
         results = []
         for ii, model in enumerate(self.features):
             x = model(x)
