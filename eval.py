@@ -102,8 +102,25 @@ def points_per_class_to_csv(
 
         pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
 
-def points_mixed_to_csv(name, points, cls_names):
-    raise NotImplementedError
+def points_mixed_to_csv(
+    points: Dict[int, dict],
+    class_names: List[str], 
+    filename: str,
+    parent_dir: str=".",
+):
+    results = defaultdict(list)
+
+    for threshold, metric_values in points.items():
+        for i, class_name in enumerate(class_names):
+            # Class name
+            results["class"].append(class_name)
+            results["threshold"].append(threshold)
+
+            # Confusion matrix for the specified class
+            for j, cls in enumerate(class_names):
+                results[cls].append(metric_values[i, j])
+
+    pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
 
 
 def points_no_class_to_csv(name, points, cls_names):
@@ -197,6 +214,9 @@ def evaluate(args, log_dir, logger):
             score_junctions_no_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
             if count > 5:
                 break
+
+
+    csv_kwargs = {"parent_dir": "."}
     # Note: Segmentation data is organized as tuples of:
     # (name, res, cls_names: List[str]), where
     # - `name` is the descriptive name of the segmentation
@@ -210,21 +230,28 @@ def evaluate(args, log_dir, logger):
         ("Icon segmentation", score_seg_icon.get_scores(), icon_cls), 
         ("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls),
     )
-    res_to_csv(segmentation_data, filename="segmentation", parent_dir=".")
+    res_to_csv(segmentation_data, filename="segmentation", **csv_kwargs)
 
     points_per_class_to_csv(
         points=score_junctions_per_class.get_scores(),
         class_names=score_junctions_per_class.classes,
         filename="wall_junctions_per_class",
-        parent_dir=".",
+        **csv_kwargs
     )
     
-    print_points_mixed("Wall junctions mixed", score_junctions_mixed.get_scores(), logger)
-    raise NotImplemented
+    points_mixed_to_csv(
+        points=score_junctions_mixed.get_scores(),
+        class_names=score_junctions_mixed.classes,
+        filename="wall_junctions_mixed",
+        **csv_kwargs
+    )
 
-    print_points_no_class("Wall junctions no class", score_junctions_no_class.get_scores(), logger)
-    raise NotImplemented
-
+    points_no_class_to_csv(
+        points=score_junctions_no_class.get_scores(),
+        class_names=score_junctions_no_class.classes,
+        filename="wall_junctions_no_class", 
+        **csv_kwargs,
+    )
 
 if __name__ == '__main__':
     time_stamp = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")

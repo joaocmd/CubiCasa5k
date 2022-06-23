@@ -115,6 +115,7 @@ class pointScorePerClass:
 
 class pointScoreMixed:
     def __init__(self, n_classes):
+        self.classes = list(range(n_classes)) + [-1] 
         self.n_classes = n_classes
         self.scores = {t: np.zeros((n_classes+1, n_classes+1), dtype=int) for t in range(0, 101, 10)} # tp fp gt
 
