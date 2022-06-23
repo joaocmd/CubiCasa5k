@@ -86,6 +86,9 @@ def train(args, log_dir, writer, logger):
         for m in [model.conv4_, model.upsample]:
             nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             nn.init.constant_(m.bias, 0)
+    elif args.arch == 'dfp':
+        model = get_model(args.arch, args.n_classes)
+        criterion = UncertaintyLoss(input_slice=input_slice)
     else:
         model = get_model(args.arch, args.n_classes)
         criterion = UncertaintyLoss(input_slice=input_slice)
@@ -154,13 +157,15 @@ def train(args, log_dir, writer, logger):
 
             loss = criterion(outputs, labels)
             lossess.append(loss.item())
-            losses = losses.append(criterion.get_loss(), ignore_index=True)
-            variances = variances.append(criterion.get_var(), ignore_index=True)
-            ss = ss.append(criterion.get_s(), ignore_index=True)
+            losses = pd.concat([losses, criterion.get_loss()], ignore_index=True)
+            variances = pd.concat([variances, criterion.get_var()], ignore_index=True)
+            ss = pd.concat([ss, criterion.get_s()], ignore_index=True)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            break
 
         avg_loss = np.mean(lossess)
         loss = losses.mean()
@@ -169,12 +174,16 @@ def train(args, log_dir, writer, logger):
 
         logging.info("Epoch [%d/%d] Loss: %.4f" % (epoch+1, args.n_epoch, avg_loss))
 
-        writer.add_scalars('training/loss', loss, global_step=1+epoch)
-        writer.add_scalars('training/variance', variance, global_step=1+epoch)
-        writer.add_scalars('training/s', s, global_step=1+epoch)
+        for i in loss.index:
+            writer.add_scalar(f'training/loss/{i}', loss[i], global_step=1+epoch)
+        for i in variance.index:
+            writer.add_scalar(f'training/variance/{i}', variance[i], global_step=1+epoch)
+        for i in s.index:
+            writer.add_scalar(f'training/s/{i}', s[i], global_step=1+epoch)
         current_lr = {'base': optimizer.param_groups[0]['lr'],
                       'var': optimizer.param_groups[1]['lr']}
-        writer.add_scalars('training/lr', current_lr, global_step=1+epoch)
+        for i in current_lr:
+            writer.add_scalar(f'training/lr/{i}', current_lr[i], global_step=1+epoch)
 
         # Validation
         model.eval()
@@ -205,9 +214,11 @@ def train(args, log_dir, writer, logger):
                 px_rooms += float(pr)
                 px_icons += float(pi)
 
-                val_losses = val_losses.append(criterion.get_loss(), ignore_index=True)
-                val_variances = val_variances.append(criterion.get_var(), ignore_index=True)
-                val_ss = val_ss.append(criterion.get_s(), ignore_index=True)
+                val_losses = pd.concat([val_losses, criterion.get_loss()], ignore_index=True)
+                val_variances = pd.concat([val_variances, criterion.get_var()], ignore_index=True)
+                val_ss  = pd.concat([val_ss, criterion.get_s()], ignore_index=True)
+
+                break
 
         val_loss = val_losses.mean()
         # print("CNN done", val_mid-val_start)
@@ -250,9 +261,17 @@ def train(args, log_dir, writer, logger):
         writer.add_scalars('validation/icon/Acc', icon_class_iou['Class Acc'], global_step=1+epoch)
         running_metrics_icon_val.reset()
 
-        writer.add_scalars('validation/loss', val_loss, global_step=1+epoch)
-        writer.add_scalars('validation/variance', val_variance, global_step=1+epoch)
-        writer.add_scalars('validation/s', val_s, global_step=1+epoch)
+        # writer.add_scalars('validation/loss', val_loss, global_step=1+epoch)
+        # writer.add_scalars('validation/variance', val_variance, global_step=1+epoch)
+        # writer.add_scalars('validation/s', val_s, global_step=1+epoch)
+        for i in val_loss.index:
+            writer.add_scalar(f'validation/loss/{i}', val_loss[i], global_step=1+epoch)
+        for i in val_variance.index:
+            writer.add_scalar(f'validation/variance/{i}', val_variance[i], global_step=1+epoch)
+        for i in val_s.index:
+            writer.add_scalar(f'validation/s/{i}', val_s[i], global_step=1+epoch)
+
+        continue
 
         if val_loss['total loss with variance'] < best_loss_var:
             best_loss_var = val_loss['total loss with variance']
@@ -394,7 +413,7 @@ if __name__ == '__main__':
                         help='Path to log directory')
     parser.add_argument('--debug', nargs='?', type=bool,
                         default=False, const=True,
-                        help='Continue training with new hyperparameters')
+                        help='Debug mode')
     parser.add_argument('--plot-samples', nargs='?', type=bool,
                         default=False, const=True,
                         help='Plot floorplan segmentations to Tensorboard.')

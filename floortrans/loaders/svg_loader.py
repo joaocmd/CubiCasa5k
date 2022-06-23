@@ -39,6 +39,7 @@ class FloorplanSVG(Dataset):
 
     def __getitem__(self, index):
         sample = self.get_data(index)
+        folder = sample['folder']
 
         if self.get_data == self.get_lmdb:
             sample['image'] = sample['image'].float()
@@ -50,7 +51,7 @@ class FloorplanSVG(Dataset):
         if self.is_transform:
             sample = self.transform(sample)
 
-        return sample
+        return {**sample, 'folder': folder}
 
     def get_txt(self, index):
         fplan = cv2.imread(self.data_folder + self.folders[index] + self.image_file_name)
