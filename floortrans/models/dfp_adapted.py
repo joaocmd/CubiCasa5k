@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
+import torchvision.transforms.functional as TF
 
 class DFPmodel(torch.nn.Module):
     def __init__(self, pretrained=True, freeze=True, n_classes=44):
@@ -158,12 +159,7 @@ class DFPmodel(torch.nn.Module):
 
         N, C, H, W = x.shape
 
-        if H%2 == 1 and  W%2 == 1:
-            x = F.pad(x, (1, 0, 1, 0), mode='replicate')
-        elif H%2 == 1:
-            x = F.pad(x, (0, 0, 1, 0), mode='replicate')
-        elif W%2 == 1:
-            x = F.pad(x, (1, 0), mode='replicate')
+        x = F.pad(x, (0, 1 if W%2 == 1 else 0 , 0, 1 if H%2 == 1 else 0), mode='replicate')
 
         results = []
         for ii, model in enumerate(self.features):
@@ -196,15 +192,18 @@ class DFPmodel(torch.nn.Module):
         ordered = torch.index_select(cat, 1, torch.LongTensor(indices).to(self.device))
 
         ordered[:, :21] = torch.sigmoid(ordered[:, :21])
-        return ordered
-        # return torch.index_select(cat, 1, torch.autograd.Variable(torch.LongTensor(indices)))
+
+        resized = TF.crop(x, 0, 0, H, W)
+        return resized
 
 
 if __name__ == "__main__":
 
     with torch.no_grad():
-        testin = torch.randn(1, 3, 800, 256)
+        testin = torch.randn(1, 3, 801, 257, device="cuda")
         model = DFPmodel()
+        model.cuda()
+        model.eval()
         ### Shared VGG encoder
         pred = model.forward(testin)
         # 0: 64x256x256, 1: 128x128x128
