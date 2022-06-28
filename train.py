@@ -165,8 +165,6 @@ def train(args, log_dir, writer, logger):
             loss.backward()
             optimizer.step()
 
-            break
-
         avg_loss = np.mean(lossess)
         loss = losses.mean()
         variance = variances.mean()
@@ -218,8 +216,6 @@ def train(args, log_dir, writer, logger):
                 val_variances = pd.concat([val_variances, criterion.get_var()], ignore_index=True)
                 val_ss  = pd.concat([val_ss, criterion.get_s()], ignore_index=True)
 
-                break
-
         val_loss = val_losses.mean()
         # print("CNN done", val_mid-val_start)
         val_variance = val_variances.mean()
@@ -270,8 +266,6 @@ def train(args, log_dir, writer, logger):
             writer.add_scalar(f'validation/variance/{i}', val_variance[i], global_step=1+epoch)
         for i in val_s.index:
             writer.add_scalar(f'validation/s/{i}', val_s[i], global_step=1+epoch)
-
-        continue
 
         if val_loss['total loss with variance'] < best_loss_var:
             best_loss_var = val_loss['total loss with variance']
@@ -422,7 +416,7 @@ if __name__ == '__main__':
                         help='Rescale to 256x256 augmentation.')
     args = parser.parse_args()
 
-    log_dir = args.log_path + '/' + time_stamp + '/'
+    log_dir = args.log_path + f'/{time_stamp}-{args.arch}/'
     writer = SummaryWriter(log_dir)
     logger = logging.getLogger('train')
     logger.setLevel(logging.DEBUG)

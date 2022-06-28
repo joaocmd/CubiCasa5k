@@ -71,7 +71,7 @@ class DFPmodel(torch.nn.Module):
         return conv
 
     def _initializeVGG(self, pretrained, freeze):
-        encmodel = models.vgg16(pretrained=pretrained)
+        encmodel = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1 if pretrained else None)
         if freeze:
             for child in encmodel.children():
                 for param in child.parameters():
@@ -159,8 +159,6 @@ class DFPmodel(torch.nn.Module):
 
         N, C, H, W = x.shape
 
-        x = F.pad(x, (0, 1 if W%2 == 1 else 0 , 0, 1 if H%2 == 1 else 0), mode='replicate')
-
         results = []
         for ii, model in enumerate(self.features):
             x = model(x)
@@ -168,19 +166,35 @@ class DFPmodel(torch.nn.Module):
                 results.append(x)
         rbfeatures = []
         for i, rbtran in enumerate(self.rbtrans):
-            x = rbtran(x)+self.rbconvs[i](results[3-i])
+            residual = results[3-i]
+            x = rbtran(x)
+
+            diffH = residual.shape[2] - x.shape[2]
+            diffW = residual.shape[3] - x.shape[3]
+            x = F.pad(x, (diffW // 2, diffW - diffW//2,
+                          diffH // 2, diffH - diffH//2))
+
+            x = x + self.rbconvs[i](residual)
             x = F.relu(self.rbgrs[i](x))
             rbfeatures.append(x)
 
-        logits_rb = F.interpolate(self.rbconvs[-1](x), scale_factor=2)
+        logits_rb = F.interpolate(self.rbconvs[-1](x), size=(H, W))
 
         x = results[-1]
         for j, rttran in enumerate(self.rttrans):
-            x = rttran(x)+self.rtconvs[j](results[3-j])
+            residual = results[3-j]
+            x = rttran(x)
+
+            diffH = residual.shape[2] - x.shape[2]
+            diffW = residual.shape[3] - x.shape[3]
+            x = F.pad(x, (diffW // 2, diffW - diffW//2,
+                          diffH // 2, diffH - diffH//2))
+
+            x = x + self.rtconvs[j](residual)
             x = F.relu(self.rtgrs[j](x))
             x = self.non_local_context(rbfeatures[j], x, j)
         
-        logits_other = F.interpolate(self.last(x), scale_factor=2)
+        logits_other = F.interpolate(self.last(x), size=(H, W))
 
         indices = list(range(44))
         # 21 heatmaps + 2 rooms -> background and outdoor
@@ -193,14 +207,13 @@ class DFPmodel(torch.nn.Module):
 
         ordered[:, :21] = torch.sigmoid(ordered[:, :21])
 
-        resized = TF.crop(x, 0, 0, H, W)
-        return resized
+        return ordered
 
 
 if __name__ == "__main__":
 
     with torch.no_grad():
-        testin = torch.randn(1, 3, 801, 257, device="cuda")
+        testin = torch.randn(1, 3, 1319, 619, device="cuda")
         model = DFPmodel()
         model.cuda()
         model.eval()
