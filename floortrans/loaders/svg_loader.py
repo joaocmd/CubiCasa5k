@@ -50,8 +50,11 @@ class FloorplanSVG(Dataset):
             
         if self.is_transform:
             sample = self.transform(sample)
-
-        return {**sample, 'folder': folder}
+        
+        val = {**sample, 'folder': folder}
+        # FIXME: delete me for evaluation
+        del val['heatmaps']
+        return val
 
     def get_txt(self, index):
         fplan = cv2.imread(self.data_folder + self.folders[index] + self.image_file_name)
