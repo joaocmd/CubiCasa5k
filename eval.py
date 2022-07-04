@@ -168,7 +168,8 @@ def points_no_class_to_csv(points, filename: str, parent_dir: str="."):
 
 def evaluate(args, log_dir, logger):
 
-    normal_set = FloorplanSVG(args.data_path, 'test.txt', format='lmdb', lmdb_folder='cubi_lmdb/', augmentations=Compose([DictToTensor()]))
+    normal_set = FloorplanSVG(args.data_path, 'test.txt', format='lmdb', lmdb_folder='cubi_lmdb/',
+                              augmentations=Compose([DictToTensor()]), return_heatmaps=True)
     data_loader = data.DataLoader(normal_set, batch_size=1, num_workers=0)
 
     checkpoint = torch.load(args.weights)
