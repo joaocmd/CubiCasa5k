@@ -74,7 +74,9 @@ Trained for 40 minutes (24 epochs), best epoch was 8:
 val_loss = 0.436
 val_acc = 0.871
 
-Test: 5879 examples (184 batches of 32) - 11.4s
+(averaged over 5 runs)
+Test: 5879 examples (184 batches of 32) - 11.3s
+No paralelization: 80.9s
 [{'test_loss': 0.3676840364933014, 'test_acc': 0.8868855237960815}]
 
 ![Confusion Matrix](./mnist-all-classes.svg)
@@ -90,7 +92,9 @@ Trained for 36 minutes (14 epochs), best epoch was 5:
 val_loss = 0.334
 val_acc = 0.909
 
-Test: 5879 examples (184 batches of 32) - 14.2s
+(averaged over 5 runs)
+Test: 5879 examples (184 batches of 32) - 13.2s
+No paralelization: 134.7s
 [{'test_loss': 0.3125835955142975, 'test_acc': 0.9067868590354919}]
 
 ![Confusion Matrix](./convnext-tiny-all-classes-replaced.svg)
@@ -106,7 +110,9 @@ Trained for 30 minutes (24 epochs), best epoch was 1:
 val_loss = 0.387
 val_acc = 0.893
 
-Test: 5879 examples (184 batches of 32) - 17.3s
+(averaged over 5 runs)
+Test: 5879 examples (184 batches of 32) - 14.8s 
+No paralelization: 233.0 s
 [{'test_loss': 0.29978010058403015, 'test_acc': 0.9021942615509033}]
 
 ![Confusion Matrix](./effnetv2-s-all-classes-replaced.svg)
