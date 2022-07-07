@@ -137,6 +137,8 @@ def train(args, log_dir, writer, logger):
             if not args.new_hyperparams:
                 optimizer.load_state_dict(checkpoint['optimizer_state'])
                 logger.info("Using old optimizer state.")
+            if args.resume_epoch:
+                start_epoch = checkpoint['epoch']
             logger.info("Loaded checkpoint '{}' (epoch {})".format(args.weights, checkpoint['epoch']))
         else:
             logger.info("No checkpoint found at '{}'".format(args.weights)) 
@@ -408,6 +410,9 @@ if __name__ == '__main__':
     parser.add_argument('--debug', nargs='?', type=bool,
                         default=False, const=True,
                         help='Debug mode')
+    parser.add_argument('--resume-epoch', nargs='?', type=bool,
+                        default=False, const=True,
+                        help='Resume from checkpoint epoch')
     parser.add_argument('--plot-samples', nargs='?', type=bool,
                         default=False, const=True,
                         help='Plot floorplan segmentations to Tensorboard.')
