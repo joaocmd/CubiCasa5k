@@ -1,3 +1,10 @@
+doors
+doors_original
+lighting_logs
+runs_cubi
+toilets
+venv
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
