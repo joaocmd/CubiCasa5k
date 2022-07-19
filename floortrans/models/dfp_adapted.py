@@ -71,7 +71,7 @@ class DFPmodel(torch.nn.Module):
         return conv
 
     def _initializeVGG(self, pretrained, freeze):
-        encmodel = models.vgg16(pretrained=pretrained)
+        encmodel = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1 if pretrained else None)
         if freeze:
             for child in encmodel.children():
                 for param in child.parameters():
