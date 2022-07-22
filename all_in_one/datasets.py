@@ -9,7 +9,8 @@ import torchvision.transforms.functional as TF
 
 import random
 
-from pathlib import Path
+from typing import Optional
+from collections.abc import Sized, Iterator
 
 door_classes = (
     'slide', 'rollup', 'none',
@@ -76,142 +77,6 @@ class RandomResizedCenterCrop(torch.nn.Module):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(max_crop_ratio={self.max_crop_ratio})"
 
-# class Doors(data.Dataset):
-#     def __init__(self, split, classes, img_size=40):
-#         self.folder = f'../doors/{split}/'
-#         self.files = os.listdir(self.folder)
-#         self.classes = {c: idx for idx, c in enumerate(classes)}
-#         self.img_size = img_size
-#         self.split = split
-
-#         self.transform = transforms.Compose([
-#             transforms.RandomRotation(7.5),
-#             transforms.ColorJitter(0.1, 0.1, 0.1, 0.1)
-#         ])
-
-#     def __len__(self):
-#         return len(self.files)
-
-#     def __getitem__(self, idx):
-#         name = self.files[idx]
-#         label = getlabel(name)
-#         img = load_image(self.folder + name, self.img_size)
-#         img = np.moveaxis(img, 2, 0)
-#         img = (img / 255) * 2 - 1
-#         if (self.split == 'train'):
-#             return self.transform(torch.tensor(img).float()), class_map[label]
-#         else:
-#             return torch.tensor(img).float(), class_map[label]
-
-# class ToiletsTrain(data.Dataset):
-#     def __init__(self, classes, split='train', img_size=100):
-#         self.classes = classes
-#         self.folder = f'../toilets/{split}/'
-#         self.files = os.listdir(self.folder)[1:] # remove A_wrong
-#         self.img_size = img_size
-#         self.split = split
-
-#         self.transforms = transforms
-#         self.transform = transforms.Compose([
-#             transforms.RandomHorizontalFlip(p=0.5),
-#             transforms.ColorJitter(0.1, 0.1, 0.1, 0.1)
-#         ])
-#         self.resize = RandomResizedCenterCrop(0.75)
-
-#     def __len__(self):
-#         return len(self.files)
-
-#     def __getitem__(self, idx):
-#         name = self.files[idx]
-#         img = load_image(self.folder + name, self.img_size)
-#         img = np.moveaxis(img, 2, 0)
-#         img = (img / 255) * 2 - 1
-#         img = torch.tensor(img).float()
-#         img = self.transform(img)
-
-#         rot = random.choice(self.classes)
-#         img = TF.rotate(img, rot, interpolation=transforms.InterpolationMode.BILINEAR, fill=1)
-
-#         img = self.resize(img)
-
-#         return img, rot//(360//len(self.classes))
-
-# class ToiletsEval(data.Dataset):
-#     def __init__(self, classes, split, n_samples=None, img_size=100, seed=0):
-#         self.classes = classes
-#         self.folder = f'../toilets/{split}/'
-#         self.files = os.listdir(self.folder)[1:] # remove A_wrong
-#         self.files = [f+'@'+str(c) for f in self.files for c in classes]
-#         if n_samples != None:
-#             random.seed(seed)
-#             self.files = random.sample(self.files, n_samples)
-#         self.img_size = img_size
-#         self.split = split
-
-#     def __len__(self):
-#         return len(self.files)
-
-#     def __getitem__(self, idx):
-#         name = self.files[idx]
-#         name, rot = name.split('@')
-#         rot = int(rot)
-
-#         img = load_image(self.folder + name, self.img_size)
-#         img = np.moveaxis(img, 2, 0)
-#         img = (img / 255) * 2 - 1
-#         img = torch.tensor(img).float()
-
-#         img = TF.rotate(img, rot, interpolation=transforms.InterpolationMode.BILINEAR, fill=1)
-
-#         return img, rot//(360//len(self.classes))
-
-# class SinksTrain(data.Dataset):
-#     def __init__(self, classes, split='train', img_size=100, ratio=0.4):
-#         self.classes = classes
-#         self.folder = f'../sinks/{split}/'
-#         self.files = os.listdir(self.folder)[1:] # remove A_wrong
-#         self.normal_files = [f for f in self.files if 'Corner' not in f]
-#         self.corner_files = [f for f in self.files if 'Corner' in f]
-        
-#         # let x be the factor we need to multiply the number of elements in c
-#         # to meet the ratio between classes
-#         # c * x = ratio * (c*x + n)
-#         # by solving for x we get:
-#         # x = (ratio*n)/((1-ratio)*c)
-
-#         if ratio != None:
-#             n = len(self.files)
-#             c = len(self.corner_files)
-#             needed_factor = (ratio*n)/((1-ratio)*c)
-#             self.corner_files = self.corner_files*int(needed_factor)
-
-#         self.sink_files = self.normal_files + self.corner_files
-#         self.img_size = img_size
-
-#         self.transform = transforms.Compose([
-#             transforms.RandomHorizontalFlip(p=0.5),
-#             transforms.ColorJitter(0.1, 0.1, 0.1, 0.1)
-#         ])
-#         self.resize = RandomResizedCenterCrop(0.75)
-
-#     def __len__(self):
-#         return len(self.sink_files)
-
-#     def __getitem__(self, idx):
-#         name = self.sink_files[idx]
-#         img = load_image(self.folder + name, self.img_size)
-#         img = np.moveaxis(img, 2, 0)
-#         img = (img / 255) * 2 - 1
-#         img = torch.tensor(img).float()
-#         img = self.transform(img)
-
-#         rot = random.choice(self.classes[:-1])
-#         img = TF.rotate(img, rot, interpolation=transforms.InterpolationMode.BILINEAR, fill=1)
-
-#         img = self.resize(img)
-
-#         return img, len(self.classes) - 1 if 'Corner' in name else rot//(360//(len(self.classes)-1))
-
 # class SinksEval(data.Dataset):
 #     def __init__(self, classes, split, n_samples=None, img_size=100, seed=0, ratio=0.3):
 #         self.classes = classes
@@ -254,15 +119,6 @@ class RandomResizedCenterCrop(torch.nn.Module):
 #         img = TF.rotate(img, rot, interpolation=transforms.InterpolationMode.BILINEAR, fill=1)
 
 #         return img, len(self.classes) - 1 if 'Corner' in name else rot//(360//(len(self.classes)-1))
-
-# class TrainSet(data.Dataset):
-    
-#     def __init__(self, split='train', image_size=80):
-        
-#         doors = Doors(classes[:13], split=split, image_size=image_size)
-#         toilets = ToiletsTrain(classes[13:13+8], split=split, image_size=image_size)
-#         toilets = SinksTrain(classes[13:13+9], split=split, image_size=image_size)
-
 
 class TrainSet(data.Dataset):
     def __init__(self, split='train', img_size=80, corner_sinks_ratio=0.4):
@@ -312,10 +168,9 @@ class TrainSet(data.Dataset):
         img = (img / 255) * 2 - 1
         img = torch.tensor(img).float()
 
-
         if 'doors' in file:
             label = getlabel(file)
-            return self.door_transform(torch.tensor(img).float()), class_map[label]
+            return self.door_transform(img), class_map[label]
         else:
             img = self.symbol_transform(img)
 
@@ -328,4 +183,80 @@ class TrainSet(data.Dataset):
             return img, label + len(door_classes)
 
 
-t = TrainSet()
+def get_train_sampler():
+    t = TrainSet()
+    return data.WeightedRandomSampler(
+        [
+            *[1/len(t.door_files)]*len(t.door_files),
+            *[1/len(t.toilet_files)]*len(t.toilet_files),
+            *[1/len(t.sink_files)]*len(t.sink_files)
+        ],
+        num_samples=len(t.all_files),
+        replacement=True
+    )
+
+class EvalSet(data.Dataset):
+    def __init__(self, split='val', img_size=80, corner_sinks_ratio=0.3,
+                 n_toilet_samples=None, n_sink_samples=None, seed=0):
+        self.img_size = img_size
+        self.split = split
+
+        folder = f'doors/{split}'
+        self.door_files = [f'{folder}/{f}' for f in os.listdir(folder)]
+
+        folder = f'toilets/{split}'
+        toilet_files = [f'{folder}/{f}' for f in os.listdir(folder)[1:]] # remove A_wrong
+        toilet_files = [f+'@'+str(c) for f in toilet_files for c in rot_classes]
+        if n_toilet_samples != None:
+            random.seed(seed)
+            toilet_files = random.sample(toilet_files, n_toilet_samples)
+
+        self.toilet_files = toilet_files
+
+        folder = f'sinks/{split}'
+        sink_files = [f'{folder}/{f}' for f in os.listdir(folder)[1:]] # remove A_wrong
+
+        normal_files = [f for f in sink_files if 'Corner' not in f]
+        corner_files = [f for f in sink_files if 'Corner' in f]
+        
+        if corner_sinks_ratio != None:
+            n = len(sink_files)
+            c = len(corner_files)
+            needed_factor = (corner_sinks_ratio*n)/((1-corner_sinks_ratio)*c)
+            corner_files = corner_files*int(needed_factor)
+
+        sink_files = normal_files + corner_files
+        sink_files = [f+'@'+str(c) for f in sink_files for c in rot_classes]
+
+        if n_sink_samples != None:
+            random.seed(seed)
+            sink_files = random.sample(sink_files, n_sink_samples)
+
+        self.sink_files = sink_files
+
+
+        self.all_files = self.door_files + self.toilet_files + self.sink_files
+    
+    def __len__(self):
+        return len(self.all_files)
+        
+    def __getitem__(self, idx):
+        file = self.all_files[idx]
+        
+        if 'doors' not in file:
+            file, rot = file.split('@')
+            rot = int(rot)
+
+        img = load_image(file, self.img_size)
+        img = np.moveaxis(img, 2, 0)
+        img = (img / 255) * 2 - 1
+        img = torch.tensor(img).float()
+
+        if 'doors' in file:
+            label = getlabel(file)
+            return img, class_map[label]
+        else:
+            img = TF.rotate(img, rot, interpolation=transforms.InterpolationMode.BILINEAR, fill=1)
+            label = len(rot_classes) if 'Corner' in file else rot//(360//len(rot_classes))
+
+            return img, label + len(door_classes)

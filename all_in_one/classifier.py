@@ -5,15 +5,14 @@ import torch.optim as optim
 import torch.utils.data as data
 import pytorch_lightning as pl
 import torchmetrics as tm
-import torchvision.transforms as transforms
 import torchvision.models as models
-
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .datasets import classes, Data
+from datasets import TrainSet, EvalSet, get_train_sampler, classes
 
+import argparse
 
 class Net(pl.LightningModule):
 
@@ -21,7 +20,7 @@ class Net(pl.LightningModule):
         super().__init__()
         self.n_classes = len(classes)
 
-        self.net = models.convnext_tiny(pretrained=True)
+        self.net = models.convnext_tiny(weights=models.ConvNeXt_Tiny_Weights.IMAGENET1K_V1)
         in_features = self.net.classifier[2].in_features
         self.net.classifier[2] = nn.Linear(in_features, len(classes))
 
@@ -65,3 +64,34 @@ class Net(pl.LightningModule):
  
     def configure_optimizers(self):
         return optim.Adam(self.parameters())
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--task', nargs='?', type=str, default='train')
+    args = parser.parse_args()
+
+    if args.task == 'train':
+        name = 'all_in_one'
+        version = 1
+
+        model = Net(classes)
+        trainloader = data.DataLoader(TrainSet(), batch_size=64, sampler=get_train_sampler(), num_workers=6)
+        valloader = data.DataLoader(EvalSet(n_toilet_samples=2000, n_sink_samples=2000), batch_size=64, num_workers=6)
+
+        logger = pl.loggers.TensorBoardLogger('lightning_logs', name=name, version=version)
+        trainer = pl.Trainer(
+            accelerator='gpu',
+            devices=1,
+            max_epochs=-1,
+            logger=logger,
+            log_every_n_steps=20,
+            callbacks=[
+                pl.callbacks.progress.TQDMProgressBar(refresh_rate=20),
+                pl.callbacks.ModelCheckpoint(monitor="val_loss", save_last=True, save_top_k=3, filename='{epoch}-{val_loss:.3f}-{val_acc:.3f}')
+            ],
+        )
+
+        trainer.fit(model, trainloader, valloader)
+    elif args.task == 'test':
+        pass
