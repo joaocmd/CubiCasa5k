@@ -87,6 +87,7 @@ def train(args, log_dir, writer, logger):
             nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             nn.init.constant_(m.bias, 0)
     elif args.arch == 'dfp':
+        # args.n_classes by default are 44
         model = get_model(args.arch, args.n_classes)
         criterion = UncertaintyLoss(input_slice=input_slice)
     else:
@@ -157,6 +158,9 @@ def train(args, log_dir, writer, logger):
 
             outputs = model(images)
 
+            print("\n\n", outputs.size(), labels.size())
+            # Outputs has dimensions 16 x 44 x 256 x 256
+            # whereas labels' dimensions are 16 x 23 x 256 x 256
             loss = criterion(outputs, labels)
             lossess.append(loss.item())
             losses = pd.concat([losses, criterion.get_loss()], ignore_index=True)
