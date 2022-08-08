@@ -52,10 +52,11 @@ def train(args, log_dir, writer, logger):
     # Setup Dataloader
     writer.add_text('parameters', str(vars(args)))
     logging.info('Loading data...')
+    # @pastelbelem8 update: add argument `return_heatmaps`
     train_set = FloorplanSVG(args.data_path, 'train.txt', format='lmdb',
-                             augmentations=aug)
+                             augmentations=aug, return_heatmaps=False)
     val_set = FloorplanSVG(args.data_path, 'val.txt', format='lmdb',
-                           augmentations=DictToTensor())
+                           augmentations=DictToTensor(), return_heatmaps=False)
 
     if args.debug:
         num_workers = 0
@@ -98,7 +99,7 @@ def train(args, log_dir, writer, logger):
 
     # Drawing graph for TensorBoard
     dummy = torch.zeros((2, 3, args.image_size, args.image_size)).cuda()
-    model(dummy)
+    # model(dummy)
     # writer.add_graph(model, dummy)
 
     params = [{'params': model.parameters(), 'lr': args.l_rate},
@@ -145,6 +146,7 @@ def train(args, log_dir, writer, logger):
             logger.info("No checkpoint found at '{}'".format(args.weights)) 
 
     for epoch in range(start_epoch, args.n_epoch):
+        print("=" * 30, f"[Epoch {epoch}]", "=" * 30)
         model.train()
         lossess = []
         losses = pd.DataFrame()

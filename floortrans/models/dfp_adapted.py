@@ -12,7 +12,8 @@ class DFPmodel(torch.nn.Module):
     """Model of the Deep FloorPlan Recognition [1].
 
     Receives images as inputs and outputs the pixel-wise classification concerning
-    the different room regions and boundaries. 
+    the different room regions and boundaries.  This code is based on the Pytorch
+    implementation for the Deep Floor Plan paper [2].
     
     It first relies on a VGG-16 model to extract a shared feature vector, common
     to both tasks.
@@ -42,16 +43,17 @@ class DFPmodel(torch.nn.Module):
         Whether to freeze the weights of the VGG-16 encoder model.
 
     number_of_classes: int, defaults to 44
-
+        The number of classes to consider.
 
     References
     ----------
     1 - https://arxiv.org/pdf/1908.11025.pdf
+    2 - https://github.com/zcemycl/PyTorch-DeepFloorplan/blob/main/net.py
     """
     def __init__(self, pretrained: bool=True, freeze: bool=True, n_classes: int=44):
         super(DFPmodel, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+        self.n_classes = n_classes
         # ----------------------------------------------------
         # 1. Initialize VGG encoder (component 1)
         # ----------------------------------------------------
@@ -61,7 +63,15 @@ class DFPmodel(torch.nn.Module):
         # ----------------------------------------------------
         # 2. Room Boundary Prediction 
         # ----------------------------------------------------
-        # Number of layers
+        # We will have a skip-connection like model. We use 
+        # VGG16 encoder's shared features and pass it through
+        # **upsampling** (rbtrans) layer. We add element-wise
+        # the upsampled representation with the encoder's
+        # representation of the previous layer (after applying
+        # a convolution with rbconvs). Finally, we apply a conv
+        # (rbgrs) to obtain the final representation.
+        # ----------------------------------------------------
+        # List of channel dimensions per layer 
         rblist = [512, 256, 128, 64, 32, 3]
         # ^Note: Last layer size equals number of RB classes: walls, doors, windows
 
@@ -69,7 +79,7 @@ class DFPmodel(torch.nn.Module):
         self.rbtrans = nn.ModuleList([self._transconv2d(
             rblist[i], rblist[i+1], 4, 2, 1) for i in range(len(rblist)-2)])
         
-        # *rbconvs* and *rbgrs*: convolutions to use in the spatial contextual module.
+        # *rbconvs* and *rbgrs*: 
         self.rbconvs = nn.ModuleList([self._conv2d(
             rblist[i], rblist[i+1], 3, 1, 1) for i in range(len(rblist)-1)])
         
@@ -81,7 +91,7 @@ class DFPmodel(torch.nn.Module):
         # ----------------------------------------------------
         rtlist = [512, 256, 128, 64, 32]
 
-        # *rttrans*: VGG decoder used to output the room regions classes
+        # *rttrans*: VGG decoder 
         self.rttrans = nn.ModuleList([self._transconv2d(
             rtlist[i], rtlist[i+1], 4, 2, 1) for i in range(len(rtlist)-1)])
         
@@ -132,8 +142,9 @@ class DFPmodel(torch.nn.Module):
         self.dfs = nn.ModuleList(self._dirawareLayer([1, 1, dim, dim],
             diag=True, flip=True) for dim in dak)
 
-        # Last layer # TODO: last layer of what?
-        # - Where are we concatenating layers?
+        # Last layer
+        # Question: Why n_classes - 3?
+        # Since the RB outputs 3 classes
         self.last = self._conv2d(clist[-1], n_classes-3, 1, 1)  # TODO: Why n_classes-3?
         # original Torch implementation is conv2d(clist[-1], 9, 1, 1)
     
@@ -239,52 +250,92 @@ class DFPmodel(torch.nn.Module):
         return out
 
     def forward(self, x):
+        # VGG16 Encoder layers where  layer size shrinks
+        MAXPOOL2D_ENCODER_LAYERS = {4, 9, 16, 23, 30}
+
         # 21 heatmap classes
         # 12 room classes
         # room_classes = ["Background", "Outdoor", "Wall", "Kitchen", "Living Room" ,"Bed Room", "Bath", "Entry", "Railing", "Storage", "Garage", "Undefined"]
         # 11 icon classes
         # icon_classes = ["No Icon", "Window", "Door", "Closet", "Electrical Appliance" ,"Toilet", "Sink", "Sauna Bench", "Fire Place", "Bathtub", "Chimney"]
 
-        print("dfp.forward", x.shape)
+        # The input fed into the network is of size N x C x H x W, where
+        # - N is the batch size
+        # - C is the number of channels
+        # - H is the picture height
+        # - W is the picture width
+        # In this case, we're processing RGB pictures 256x256, so 
+        # the size is [N, 3, 256, 256]
         N, C, H, W = x.shape
 
+        # ------------------------------------------------
+        # Encoder forward
+        # ------------------------------------------------
+        # []
         results = []
         for ii, model in enumerate(self.features):
             x = model(x)
-            if ii in {4, 9, 16, 23, 30}:
+            if ii in MAXPOOL2D_ENCODER_LAYERS:
                 results.append(x)
+
+        # ------------------------------------------------
+        # Room Boundary
+        # ------------------------------------------------
+        # rbtrans contains 4 layers: 
+        # (512, 256), (256, 128), (128, 64), (64, 32)
         rbfeatures = []
         for i, rbtran in enumerate(self.rbtrans):
             residual = results[3-i]
             x = rbtran(x)
-
+            # Update: @joaocmd
+            # Check if we need to pad due to changes in the images size
+            # ---------------------------------------------------------------
+            # Question: Why do we perform padding at this stage and not 
+            # earlier in the process before feeding images to the network? 
+            # Answer (2022-Aug-08): for flexibility. By resizing images later 
+            # in the network we support images of any size to be fed to the
+            # network. Doing it earlier might lead to loss of information, as
+            # upsampling the images might make them blurred or too small.
+            # Another alternative could be to crop several images and combine
+            # them in the end.
+            # --------------------------------------------------------------- 
             diffH = residual.shape[2] - x.shape[2]
             diffW = residual.shape[3] - x.shape[3]
-            x = F.pad(x, (diffW // 2, diffW - diffW//2,
-                          diffH // 2, diffH - diffH//2))
-
+            if diffH != 0 or diffW != 0:
+                pad_horizont = diffW // 2
+                pad_vertical = diffH // 2
+                # (pad_left, pad_right, pad_top, pad_bottom)
+                padding = ( pad_horizont, pad_horizont + diffW % 2,
+                            pad_vertical, pad_vertical + diffH % 2)
+                x = F.pad(x, padding)
+            # end update @joaocmd ------------------------------------------
             x = x + self.rbconvs[i](residual)
             x = F.relu(self.rbgrs[i](x))
             rbfeatures.append(x)
 
         logits_rb = F.interpolate(self.rbconvs[-1](x), size=(H, W))
-
-        x = results[-1]
+        
+        x = results[-1] # size: N x 256 x 8 x 8
         for j, rttran in enumerate(self.rttrans):
             residual = results[3-j]
             x = rttran(x)
-
+            # Update: @joaocmd
             diffH = residual.shape[2] - x.shape[2]
             diffW = residual.shape[3] - x.shape[3]
-            x = F.pad(x, (diffW // 2, diffW - diffW//2,
-                          diffH // 2, diffH - diffH//2))
-
+            if diffH != 0 or diffW != 0:
+                pad_horizont = diffW // 2
+                pad_vertical = diffH // 2
+                # (pad_left, pad_right, pad_top, pad_bottom)
+                padding = ( pad_horizont, pad_horizont + diffW % 2,
+                            pad_vertical, pad_vertical + diffH % 2)
+                x = F.pad(x, padding)
+            # end update @joaocmd ------------------------------------------
             x = x + self.rtconvs[j](residual)
             x = F.relu(self.rtgrs[j](x))
             x = self.non_local_context(rbfeatures[j], x, j)
         
         logits_other = F.interpolate(self.last(x), size=(H, W))
-
+        # Update: @joao
         indices = list(range(44))
         # 21 heatmaps + 2 rooms -> background and outdoor
         indices = indices[:21+2] + [41] + indices[21+2:-1]
@@ -295,7 +346,7 @@ class DFPmodel(torch.nn.Module):
         ordered = torch.index_select(cat, 1, torch.LongTensor(indices).to(self.device))
 
         ordered[:, :21] = torch.sigmoid(ordered[:, :21])
-
+        # Update @joao: original code was returning two different outputs
         return ordered
 
 

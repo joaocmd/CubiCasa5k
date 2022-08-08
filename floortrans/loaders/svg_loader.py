@@ -40,6 +40,13 @@ class FloorplanSVG(Dataset):
         return len(self.folders)
 
     def __getitem__(self, index):
+        # sample["image"] size is num_channels x img_width x img_height
+        # sample["label"] size is 2 x img_width x img_height (pixel-wise clf)
+        # sample["label"][0] is the classification of rooms (12 labels)
+        # sample["label"][1] is the classification of the icons (11 labels)
+        # Note: 
+        # - room_classes = ["Background", "Outdoor", "Wall", "Kitchen", "Living Room" ,"Bed Room", "Bath", "Entry", "Railing", "Storage", "Garage", "Undefined"]
+        # - icon_classes = ["No Icon", "Window", "Door", "Closet", "Electrical Applience" ,"Toilet", "Sink", "Sauna Bench", "Fire Place", "Bathtub", "Chimney"]
         sample = self.get_data(index)
         folder = sample['folder']
 
@@ -48,14 +55,44 @@ class FloorplanSVG(Dataset):
             sample['label'] = sample['label'].float()
 
         if self.augmentations is not None:
+            # Note: the augmentation DictToTensor transforms sample["label"]
+            # from 2 x img_width x img_height to 23 x img_width x img_height
             sample = self.augmentations(sample)
-            
+         
         if self.is_transform:
             sample = self.transform(sample)
 
         val = {**sample, 'folder': folder}
         if not self.return_heatmaps:
             del val['heatmaps']
+        else:
+            # Note: If we end up using the heatmaps as classes, the attribute
+            # sample["heatmaps"] will be a dictionary where the keys are one of
+            # the following classes, and the values are the pixels location:
+            #   0. I
+            #   1. I top to right
+            #   2. I vertical flip
+            #   3. I top to left
+            #   4. L horizontal flip
+            #   5. L
+            #   6. L vertical flip
+            #   7. L horizontal and vertical flip
+            #   8. T
+            #   9. T top to right
+            #   10. T top to down
+            #   11. T top to left
+            #   12. X or +
+            #   13. Opening left corner
+            #   14. Opening right corner
+            #   15. Opening up corner
+            #   16. Opening down corer
+            #   17. Icon upper left
+            #   18. Icon upper right
+            #   19. Icon lower left
+            #   20. Icon lower right
+            # To use it for classification we need to add an extra value for
+            # the "non-junction".
+            pass
         return val
 
     def get_txt(self, index):
