@@ -47,6 +47,12 @@ class UncertaintyLoss(Module):
             rooms_target = rooms_target.type(torch.LongTensor) - self.sub
             icons_target = icons_target.type(torch.LongTensor) - self.sub
 
+        if rooms_target.min().item() < 0 or rooms_target.max().item() > 11:
+            print(rooms_target.min().item(), ">0", rooms_target.max().item(), "<12", rooms_pred.shape[1], "==12")
+    
+        if icons_target.min().item() < 0 or icons_target.max().item() > 11:
+            print(icons_target.min().item(), ">0", icons_target.max().item(), "<11", icons_pred.shape[1], "==11")
+
         self.loss_rooms_var = cross_entropy(input=rooms_pred*torch.exp(-self.log_vars[0]), target=rooms_target)
         self.loss_icons_var = cross_entropy(input=icons_pred*torch.exp(-self.log_vars[1]), target=icons_target)
 
