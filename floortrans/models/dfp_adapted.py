@@ -201,23 +201,11 @@ class DFPmodel(torch.nn.Module):
             k = nn.Parameter(w, requires_grad=trainable)
         return k
     
-    # Not used in the project. Let's simplify.
-    # -------------------------------------------
-    # def context_conv2d(self, t, dim=1, size=7, diag=False,
-    #         flip=False, stride=1, trainable=False):
-    #     N, C, H, W = t.size(0), t.size(1), t.size(2), t.size(3)
-    #     in_dim = C
-    #     size = size if isinstance(size, (tuple, list)) else [size, size]
-    #     stride = stride if isinstance(stride, (tuple, list)) else [1, stride, stride, 1]
-    #     shape = [dim, in_dim, size[0], size[1]]
-    #     w = self.constant_kernel(shape, diag=diag, flip=flip, trainable=trainable)
-    #     pad = ((np.array(shape[2:])-1)/2).astype(int)
-    #     conv = nn.Conv2d(1, 1, shape[2:], 1, list(pad), bias=False)
-    #     conv.weight = w
-    #     conv.to(self.device);
-    #     return conv(t)
-
     def non_local_context(self, t1, t2, idx, stride=4):
+        """Apply the spatial contextual attention module"""
+        # Example of invocations: rbfeatures[j], x, j
+        # t1 is the RB features
+        # t2 is the current RT feature 
         N, C, H, W = t1.size(0), t1.size(1), t1.size(2), t1.size(3)
         hs = H // stride if (H // stride) > 1 else (stride-1)
         vs = W // stride if (W // stride) > 1 else (stride-1)
@@ -271,13 +259,14 @@ class DFPmodel(torch.nn.Module):
         # ------------------------------------------------
         # Encoder forward
         # ------------------------------------------------
-        # []
         results = []
         for ii, model in enumerate(self.features):
             x = model(x)
             if ii in MAXPOOL2D_ENCODER_LAYERS:
                 results.append(x)
-
+        # ^Note: results[-1] will have the "shared features"
+        # from the VGG encoder. It's size is N x 512 x 8 x 8
+        
         # ------------------------------------------------
         # Room Boundary
         # ------------------------------------------------
@@ -312,9 +301,20 @@ class DFPmodel(torch.nn.Module):
             x = x + self.rbconvs[i](residual)
             x = F.relu(self.rbgrs[i](x))
             rbfeatures.append(x)
-
-        logits_rb = F.interpolate(self.rbconvs[-1](x), size=(H, W))
+        # x.shape: batch_size x 32 x 128 x 128, 
+        # rbconvs[-1] is a conv layer from in=32 to out=3 channels
+        rb_outputs = self.rbconvs[-1](x)
+        # Resize to H x W
+        logits_rb = F.interpolate(rb_outputs, size=(H, W))
         
+        # ------------------------------------------------
+        # Room Type prediction
+        # ------------------------------------------------
+        # Similarly to the RB network it applies a skip
+        # connection (using a residual from the VGG encoder)
+        # and the transformation of the shared feature 
+        # representation.
+        # ------------------------------------------------ 
         x = results[-1] # size: N x 256 x 8 x 8
         for j, rttran in enumerate(self.rttrans):
             residual = results[3-j]
@@ -334,9 +334,18 @@ class DFPmodel(torch.nn.Module):
             x = F.relu(self.rtgrs[j](x))
             x = self.non_local_context(rbfeatures[j], x, j)
         
-        logits_other = F.interpolate(self.last(x), size=(H, W))
-        # Update: @joao
-        indices = list(range(44))
+        logits_other = F.interpolate(self.last(x), size=(H, W)) # 16 x 41 x 128 x 128 --> 16 x 41 x 256 x 256
+        # Update: @joao ----------------------------------------------------
+        # We have three tasks in total: 1x regression + 2 multi-class
+        # 1. **Regression tasks** (21) for the junctions heatmaps. These are
+        # passed through a sigmoid and will be alocated to the first 21 
+        # positions of the output. 
+        # 2. **Classification** (12): rooms classification.
+        # 3. **Classification** (11): icons classification.
+        # 
+        # The output of logits_other predicts 41 classes, which we will combine
+        # 
+        indices = list(range(self.n_classes))
         # 21 heatmaps + 2 rooms -> background and outdoor
         indices = indices[:21+2] + [41] + indices[21+2:-1]
         # 21 heatmaps + 12 room classes + 1 icon -> no icon
@@ -346,9 +355,9 @@ class DFPmodel(torch.nn.Module):
         ordered = torch.index_select(cat, 1, torch.LongTensor(indices).to(self.device))
 
         ordered[:, :21] = torch.sigmoid(ordered[:, :21])
+
         # Update @joao: original code was returning two different outputs
         return ordered
-
 
 if __name__ == "__main__":
 
