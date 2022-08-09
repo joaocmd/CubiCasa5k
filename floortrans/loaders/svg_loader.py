@@ -58,7 +58,12 @@ class FloorplanSVG(Dataset):
             # Note: the augmentation DictToTensor transforms sample["label"]
             # from 2 x img_width x img_height to 23 x img_width x img_height
             sample = self.augmentations(sample)
+            if torch.any(sample['label'][-1] > 10):
+                print("Danger! Icons' label above 10 for index", index)
          
+            if torch.any(sample['label'][-2] > 11):
+                print("Danger! Rooms' label above 11 for index", index)
+
         if self.is_transform:
             sample = self.transform(sample)
 
@@ -138,6 +143,8 @@ class FloorplanSVG(Dataset):
 
         sample = pickle.loads(data)
         sample['folder'] = key
+        if "9243" in self.folders[index]:
+            print(key)
         sample['heatmaps'] = {i: [[int(x), int(y)] for x, y in v] for i, v in sample['heatmaps'].items()}
 
         return sample
