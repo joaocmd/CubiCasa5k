@@ -1,0 +1,38 @@
+        split                              filename    idx        height         width
+count   12983                                 12983  12983  12983.000000  12983.000000
+unique      3                                 12983     30           NaN           NaN
+top     train  colorful_11260_DoubleSinkRight_1.png  0.png           NaN           NaN
+freq    10888                                     1   4840           NaN           NaN
+mean      NaN                                   NaN    NaN     85.901949     85.901949
+std       NaN                                   NaN    NaN     10.615005     10.615005
+min       NaN                                   NaN    NaN     46.000000     46.000000
+25%       NaN                                   NaN    NaN     79.000000     79.000000
+50%       NaN                                   NaN    NaN     86.000000     86.000000
+75%       NaN                                   NaN    NaN     95.000000     95.000000
+max       NaN                                   NaN    NaN    128.000000    128.000000
+
+split,width (mean),width (median),height (mean), height (median)
+test,85.93068391866913,86.0,85.93068391866913,86.0
+train,85.9622520205731,86.0,85.9622520205731,86.0
+val,85.22309970384995,86.0,85.22309970384995,86.0
+total,85.90194870214897,86.0,85.90194870214897,86.0
+
+split,type,count
+test,CornerSink,6
+test,DoubleSink,181
+test,DoubleSinkRight,69
+test,RoundSink,104
+test,SideSink,5
+test,Sink,717
+train,CornerSink,35
+train,DoubleSink,1946
+train,DoubleSinkRight,835
+train,RoundSink,1545
+train,SideSink,88
+train,Sink,6439
+val,CornerSink,6
+val,DoubleSink,188
+val,DoubleSinkRight,42
+val,RoundSink,137
+val,SideSink,17
+val,Sink,623

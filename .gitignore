@@ -5,6 +5,8 @@ runs_cubi
 toilets
 venv
 
+**/*.pth
+
 # Jupyter Notebook
 .ipynb_checkpoints
 

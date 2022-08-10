@@ -76,7 +76,7 @@ if __name__ == '__main__':
         version = 1
 
         model = Net(classes)
-        trainloader = data.DataLoader(TrainSet(), batch_size=64, sampler=get_train_sampler(), num_workers=6)
+        trainloader = data.DataLoader(TrainSet(), batch_size=64, sampler=get_train_sampler(num_samples=30000), num_workers=6)
         valloader = data.DataLoader(EvalSet(n_toilet_samples=2000, n_sink_samples=2000), batch_size=64, num_workers=6)
 
         logger = pl.loggers.TensorBoardLogger('lightning_logs', name=name, version=version)
@@ -92,6 +92,8 @@ if __name__ == '__main__':
             ],
         )
 
+        # this line is used to load the checkpoint, for some reason it does not work in the .fit call
+        # trainer.test(model, valloader, ckpt_path=f'lightning_logs/all_in_one/version_{version-1}/checkpoints/last.ckpt')
         trainer.fit(model, trainloader, valloader)
     elif args.task == 'test':
         pass

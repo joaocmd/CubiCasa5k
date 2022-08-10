@@ -13,7 +13,7 @@ from typing import Optional
 from collections.abc import Sized, Iterator
 
 door_classes = (
-    'slide', 'rollup', 'none',
+    'none', 'slide', 'rollup',
     'double_d', 'double_u',
     'opposite_ul_dl', 'opposite_ul_dr', 'opposite_ur_dl', 'opposite_ur_dr',
     'single_dl', 'single_dr', 'single_ul', 'single_ur',
@@ -174,7 +174,7 @@ class TrainSet(data.Dataset):
         else:
             img = self.symbol_transform(img)
 
-            rot = random.choice(rot_classes[:-1])
+            rot = random.choice(rot_classes)
             img = TF.rotate(img, rot, interpolation=transforms.InterpolationMode.BILINEAR, fill=1)
 
             img = self.resize(img)
@@ -183,7 +183,7 @@ class TrainSet(data.Dataset):
             return img, label + len(door_classes)
 
 
-def get_train_sampler():
+def get_train_sampler(num_samples=63186):
     t = TrainSet()
     return data.WeightedRandomSampler(
         [
@@ -191,7 +191,7 @@ def get_train_sampler():
             *[1/len(t.toilet_files)]*len(t.toilet_files),
             *[1/len(t.sink_files)]*len(t.sink_files)
         ],
-        num_samples=len(t.all_files),
+        num_samples=num_samples, # total is 63168
         replacement=True
     )
 
