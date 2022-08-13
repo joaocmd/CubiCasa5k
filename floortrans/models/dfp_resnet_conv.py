@@ -8,13 +8,13 @@ import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 
 
-class DFPConvModel(torch.nn.Module):
+class DFPResNetConvModel(torch.nn.Module):
     """Model of the Deep FloorPlan Recognition [1].
 
     Receives images as inputs and outputs the pixel-wise classification concerning
     the different room regions and boundaries.  This code is based on the Pytorch
     implementation for the Deep Floor Plan paper [2].
-    
+
     It first relies on a VGG-16 model to extract a shared feature vector, common
     to both tasks.
     The authors proposed a multi-task model comprising different components:
@@ -51,7 +51,7 @@ class DFPConvModel(torch.nn.Module):
     2 - https://github.com/zcemycl/PyTorch-DeepFloorplan/blob/main/net.py
     """
     def __init__(self, pretrained: bool=True, freeze: bool=True, n_classes: int=44):
-        super(DFPmodel, self).__init__()
+        super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.n_classes = n_classes
         # ----------------------------------------------------
@@ -162,18 +162,16 @@ class DFPConvModel(torch.nn.Module):
 
     def _initializeVGG(self, pretrained: bool, freeze: bool):
         """Initialize the VGG encoder model."""
-        encmodel = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1 if pretrained else None)
+        encmodel = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
+        # encmodel = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
+        # encmodel = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None)
 
         if freeze:
             for child in encmodel.children():
                 for param in child.parameters():
                     param.requires_grad = False
-        # Note: 
-        # I printed the features and it consists of exactly 31 layers,
-        # making the slicing irrelevant.
-        # print("\n\n\n\n\n\n", encmodel.features, "\n\n\n\n\n\n")
-        # https://pytorch.org/vision/main/_modules/torchvision/models/vgg.html#vgg16
-        features = list(encmodel.features)[:31] 
+
+        features = list(encmodel.children())[:-2]
         self.features = nn.ModuleList(features)
     
     def _conv2d(self, in_: int, out: int, kernel: int, stride: int=1, padding: int=0):
@@ -241,7 +239,7 @@ class DFPConvModel(torch.nn.Module):
 
     def forward(self, x):
         # VGG16 Encoder layers where  layer size shrinks
-        MAXPOOL2D_ENCODER_LAYERS = {4, 9, 16, 23, 30}
+        DOWNSAMPLE_LAYERS = {0, 3, 5, 6, 7}
 
         # 21 heatmap classes
         # 12 room classes
@@ -264,7 +262,7 @@ class DFPConvModel(torch.nn.Module):
         results = []
         for ii, model in enumerate(self.features):
             x = model(x)
-            if ii in MAXPOOL2D_ENCODER_LAYERS:
+            if ii in DOWNSAMPLE_LAYERS:
                 results.append(x)
         # ^Note: results[-1] will have the "shared features"
         # from the VGG encoder. It's size is N x 512 x 8 x 8
@@ -296,8 +294,8 @@ class DFPConvModel(torch.nn.Module):
                 pad_horizont = diffW // 2
                 pad_vertical = diffH // 2
                 # (pad_left, pad_right, pad_top, pad_bottom)
-                padding = ( pad_horizont, pad_horizont + diffW % 2,
-                            pad_vertical, pad_vertical + diffH % 2)
+                padding = (pad_horizont, pad_horizont + diffW % 2,
+                           pad_vertical, pad_vertical + diffH % 2)
                 x = F.pad(x, padding)
             # end update @joaocmd ------------------------------------------
             x = x + self.rbconvs[i](residual)
@@ -329,8 +327,8 @@ class DFPConvModel(torch.nn.Module):
                 pad_horizont = diffW // 2
                 pad_vertical = diffH // 2
                 # (pad_left, pad_right, pad_top, pad_bottom)
-                padding = ( pad_horizont, pad_horizont + diffW % 2,
-                            pad_vertical, pad_vertical + diffH % 2)
+                padding = (pad_horizont, pad_horizont + diffW % 2,
+                           pad_vertical, pad_vertical + diffH % 2)
                 x = F.pad(x, padding)
             # end update @joaocmd ------------------------------------------
             x = x + self.rtconvs[j](residual)
@@ -366,12 +364,12 @@ class DFPConvModel(torch.nn.Module):
 if __name__ == "__main__":
 
     with torch.no_grad():
-        testin = torch.randn(1, 3, 1319, 619, device="cuda")
-        model = DFPmodel()
+        testin = torch.randn(1, 3, 256, 256, device="cuda")
+        model = DFPResNetConvModel()
         model.cuda()
         model.eval()
         ### Shared VGG encoder
-        pred = model.forward(testin)
+        pred = model(testin)
         # 0: 64x256x256, 1: 128x128x128
         # 2: 256x64x64, 3: 512x32x32, 4: 512x16x16
         print(pred.shape)
