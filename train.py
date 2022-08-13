@@ -54,9 +54,9 @@ def train(args, log_dir, writer, logger):
     logging.info('Loading data...')
     # @pastelbelem8 update: add argument `return_heatmaps`
     train_set = FloorplanSVG(args.data_path, 'train.txt', format='lmdb',
-                             augmentations=aug, return_heatmaps=False)
+                             augmentations=aug, is_transform=True, return_heatmaps=False)
     val_set = FloorplanSVG(args.data_path, 'val.txt', format='lmdb',
-                           augmentations=DictToTensor(), return_heatmaps=False)
+                           augmentations=DictToTensor(), is_transform=True, return_heatmaps=False)
 
     if args.debug:
         num_workers = 0

@@ -14,7 +14,7 @@ def main(args, logger):
     env = lmdb.open(args.lmdb, map_size=int(200e9))
 
     logger.info("Creating data loader...")
-    data = FloorplanSVG(args.data_path, args.txt, format='txt', original_size=True, is_transform=False)
+    data = FloorplanSVG(args.data_path, args.txt, format='txt', original_size=True, is_transform=False, return_heatmaps=True)
 
     logger.info("Parsing data...")
     if args.overwrite:

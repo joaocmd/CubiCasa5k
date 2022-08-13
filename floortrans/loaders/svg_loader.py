@@ -30,6 +30,7 @@ class FloorplanSVG(Dataset):
                                   max_readers=8, lock=False,
                                   readahead=True, meminit=False)
             self.get_data = self.get_lmdb
+            self.is_transform = True
 
         self.data_folder = data_folder
         # Load txt file to list
