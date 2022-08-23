@@ -87,11 +87,8 @@ def train(args, log_dir, writer, logger):
         for m in [model.conv4_, model.upsample]:
             nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             nn.init.constant_(m.bias, 0)
-    elif args.arch == 'dfp':
-        # args.n_classes by default are 44
-        model = get_model(args.arch, args.n_classes)
-        criterion = UncertaintyLoss(input_slice=input_slice)
     else:
+        # args.n_classes by default are 44
         model = get_model(args.arch, args.n_classes)
         criterion = UncertaintyLoss(input_slice=input_slice)
 

@@ -1,10 +1,11 @@
-from floortrans.models.hg_furukawa_original import *
+from floortrans.models.hg_furukawa_original import hg_furukawa_original
 from floortrans.models.dfp_adapted import DFPmodel
 from floortrans.models.dfp_conv import DFPConvModel
 from floortrans.models.dfp_resnet50 import DFPResNet50Model
 from floortrans.models.dfp_resnet50_conv import DFPResNet50ConvModel
 from floortrans.models.dfp_resnet34 import DFPResNet34Model
 from floortrans.models.dfp_resnet34_conv import DFPResNet34ConvModel
+from floortrans.models.deeplabv3 import DeepLabModel
 
 def get_model(name, n_classes=None, version=None):
     if name == 'hg_furukawa_original':
@@ -22,9 +23,9 @@ def get_model(name, n_classes=None, version=None):
         model = DFPResNet50Model(pretrained=True, freeze=False, n_classes=n_classes)
     elif name == 'dfp-resnet50-conv':
         model = DFPResNet50ConvModel(pretrained=True, freeze=False, n_classes=n_classes)
+    elif name == 'deeplabv3':
+        model = DeepLabModel(pretrained=True, n_classes=n_classes)
     else:
         raise ValueError('Model {} not available'.format(name))
 
     return model
-
-
