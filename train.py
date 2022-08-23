@@ -142,7 +142,11 @@ def train(args, log_dir, writer, logger):
         else:
             logger.info("No checkpoint found at '{}'".format(args.weights)) 
 
+    stop_training = False
     for epoch in range(start_epoch, args.n_epoch):
+        if stop_training:
+            break
+
         print("=" * 30, f"[Epoch {epoch}]", "=" * 30)
         model.train()
         lossess = []
@@ -236,13 +240,15 @@ def train(args, log_dir, writer, logger):
                 no_improvement = 0
             else:
                 no_improvement += 1
-            if no_improvement >= args.patience:
+            if no_improvement >= args.patience and optimizer.param_groups[i]['lr'] > args.min_l_rate:
                 logger.info("No no_improvement for " + str(no_improvement) + " loading last best model and reducing learning rate.")
                 checkpoint = torch.load(log_dir+"/model_best_val_loss_var.pkl")
                 model.load_state_dict(checkpoint['model_state'])
                 for i, p in enumerate(optimizer.param_groups):
                     optimizer.param_groups[i]['lr'] = p['lr'] * 0.1
                 no_improvement = 0
+            elif no_improvement >= args.stopping_patience:
+                stop_training = True
 
         elif args.optimizer == 'sgd' or 'adam-scheduler':
             scheduler.step(epoch+1)
@@ -393,12 +399,16 @@ if __name__ == '__main__':
                         help='Image size in training')
     parser.add_argument('--l-rate', nargs='?', type=float, default=1e-3,
                         help='Learning Rate')
+    parser.add_argument('--min-l-rate', nargs='?', type=float, default=2e-6,
+                        help='Learning Rate')
     parser.add_argument('--l-rate-var', nargs='?', type=float, default=1e-3,
                         help='Learning Rate for Variance')
     parser.add_argument('--l-rate-drop', nargs='?', type=float, default=200,
                         help='Learning rate drop after how many epochs?')
     parser.add_argument('--patience', nargs='?', type=int, default=10,
                         help='Learning rate drop patience')
+    parser.add_argument('--stopping-patience', nargs='?', type=int, default=25,
+                        help='Early stopping patience')
     parser.add_argument('--feature-scale', nargs='?', type=int, default=1,
                         help='Divider for # of features to use')
     parser.add_argument('--weights', nargs='?', type=str, default=None,
