@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 
 
-class DFPResNetConvModel(torch.nn.Module):
+class DFPResNet50Model(torch.nn.Module):
     """Model of the Deep FloorPlan Recognition [1].
 
     Receives images as inputs and outputs the pixel-wise classification concerning
@@ -72,7 +72,7 @@ class DFPResNetConvModel(torch.nn.Module):
         # (rbgrs) to obtain the final representation.
         # ----------------------------------------------------
         # List of channel dimensions per layer 
-        rblist = [512, 256, 128, 64, 32, 3]
+        rblist = [2048, 1024, 512, 64, 64, 3]
         # ^Note: Last layer size equals number of RB classes: walls, doors, windows
 
         # *rbtrans*: VGG decoder that will be used to output the classes
@@ -85,12 +85,11 @@ class DFPResNetConvModel(torch.nn.Module):
         
         self.rbgrs = nn.ModuleList([self._conv2d(
             rblist[i], rblist[i], 3, 1, 1) for i in range(1, len(rblist)-1)])
-        self.rblastconv = self._conv2d(3, 3, 1)
 
         # ----------------------------------------------------
         # 3. Room Type Prediction 
         # ----------------------------------------------------
-        rtlist = [512, 256, 128, 64, 32]
+        rtlist = [2048, 1024, 512, 64, 64]
 
         # *rttrans*: VGG decoder 
         self.rttrans = nn.ModuleList([self._transconv2d(
@@ -101,13 +100,12 @@ class DFPResNetConvModel(torch.nn.Module):
             rtlist[i], rtlist[i+1], 3, 1, 1) for i in range(len(rtlist)-1)])
         self.rtgrs = nn.ModuleList([self._conv2d(
             rtlist[i], rtlist[i], 3, 1, 1) for i in range(1, len(rtlist))])
-        self.rtlastconv = self._conv2d(41, 41, 1)
 
         # ----------------------------------------------------
         # 4. Attention Mechanism 
         # ----------------------------------------------------
         # Attention Non-local context
-        clist = [256, 128, 64, 32]
+        clist = [1024, 512, 64, 64]
         self.ac1s = nn.ModuleList(self._conv2d(
             clist[i], clist[i], 3, 1, 1) for i in range(len(clist)))
         self.ac2s = nn.ModuleList(self._conv2d(
@@ -162,9 +160,9 @@ class DFPResNetConvModel(torch.nn.Module):
 
     def _initializeVGG(self, pretrained: bool, freeze: bool):
         """Initialize the VGG encoder model."""
-        encmodel = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
+        # encmodel = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
         # encmodel = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
-        # encmodel = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None)
+        encmodel = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None)
 
         if freeze:
             for child in encmodel.children():
@@ -273,8 +271,9 @@ class DFPResNetConvModel(torch.nn.Module):
         # rbtrans contains 4 layers: 
         # (512, 256), (256, 128), (128, 64), (64, 32)
         rbfeatures = []
+        last = len(results) - 2
         for i, rbtran in enumerate(self.rbtrans):
-            residual = results[3-i]
+            residual = results[last-i]
             x = rbtran(x)
             # Update: @joaocmd
             # Check if we need to pad due to changes in the images size
@@ -298,7 +297,7 @@ class DFPResNetConvModel(torch.nn.Module):
                            pad_vertical, pad_vertical + diffH % 2)
                 x = F.pad(x, padding)
             # end update @joaocmd ------------------------------------------
-            x = x + self.rbconvs[i](residual)
+            x = x + residual
             x = F.relu(self.rbgrs[i](x))
             rbfeatures.append(x)
         # x.shape: batch_size x 32 x 128 x 128, 
@@ -306,7 +305,6 @@ class DFPResNetConvModel(torch.nn.Module):
         rb_outputs = self.rbconvs[-1](x)
         # Resize to H x W
         logits_rb = F.interpolate(rb_outputs, size=(H, W))
-        logits_rb = self.rblastconv(logits_rb)
         
         # ------------------------------------------------
         # Room Type prediction
@@ -318,7 +316,7 @@ class DFPResNetConvModel(torch.nn.Module):
         # ------------------------------------------------ 
         x = results[-1] # size: N x 256 x 8 x 8
         for j, rttran in enumerate(self.rttrans):
-            residual = results[3-j]
+            residual = results[last-j]
             x = rttran(x)
             # Update: @joaocmd
             diffH = residual.shape[2] - x.shape[2]
@@ -331,12 +329,11 @@ class DFPResNetConvModel(torch.nn.Module):
                            pad_vertical, pad_vertical + diffH % 2)
                 x = F.pad(x, padding)
             # end update @joaocmd ------------------------------------------
-            x = x + self.rtconvs[j](residual)
+            x = x + residual
             x = F.relu(self.rtgrs[j](x))
             x = self.non_local_context(rbfeatures[j], x, j)
         
         logits_other = F.interpolate(self.last(x), size=(H, W)) # 16 x 41 x 128 x 128 --> 16 x 41 x 256 x 256
-        logits_other = self.rtlastconv(logits_other)
         # Update: @joao ----------------------------------------------------
         # We have three tasks in total: 1x regression + 2 multi-class
         # 1. **Regression tasks** (21) for the junctions heatmaps. These are
@@ -364,8 +361,9 @@ class DFPResNetConvModel(torch.nn.Module):
 if __name__ == "__main__":
 
     with torch.no_grad():
-        testin = torch.randn(1, 3, 256, 256, device="cuda")
-        model = DFPResNetConvModel()
+        # testin = torch.randn(1, 3, 512, 512, device="cuda")
+        testin = torch.randn(1, 3, 1213, 956, device="cuda")
+        model = DFPResNet50Model()
         model.cuda()
         model.eval()
         ### Shared VGG encoder
