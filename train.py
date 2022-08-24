@@ -159,13 +159,18 @@ def train(args, log_dir, writer, logger):
             images = samples['image'].cuda(non_blocking=True)
             labels = samples['label'].cuda(non_blocking=True)
 
-            outputs = model(images)
+            try:
+                outputs = model(images)
 
-            print("\n\n", outputs.size(), labels.size())
-            # Outputs has dimensions 16 x 44 x 256 x 256
-            # whereas labels' dimensions are 16 x 23 x 256 x 256
-            loss = criterion(outputs, labels)
-            lossess.append(loss.item())
+                # print("\n\n", outputs.size(), labels.size())
+                # Outputs has dimensions 16 x 44 x 256 x 256
+                # whereas labels' dimensions are 16 x 23 x 256 x 256
+                loss = criterion(outputs, labels)
+                lossess.append(loss.item())
+            except:
+                print("Skipped example...\n\n")
+                optimizer.zero_grad()
+                continue
             losses = pd.concat([losses, criterion.get_loss()], ignore_index=True)
             variances = pd.concat([variances, criterion.get_var()], ignore_index=True)
             ss = pd.concat([ss, criterion.get_s()], ignore_index=True)
