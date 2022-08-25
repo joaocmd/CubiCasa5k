@@ -1,6 +1,5 @@
 import matplotlib
 matplotlib.use('pdf')
-import sys
 import os
 import logging
 import json
@@ -10,6 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import pandas as pd
+import random
+
 from datetime import datetime
 from floortrans.loaders.augmentations import (RandomCropToSizeTorch,
                                               ResizePaddedTorch,
@@ -31,8 +32,15 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import matplotlib.pyplot as plt
 
 
-def train(args, log_dir, writer, logger):
+def set_all_seeds(seed: int=1234):
+    # https://pytorch.org/docs/stable/notes/randomness.html
+    torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
+
+def train(args, log_dir, writer, logger, seed):
+    set_all_seeds(seed)
     with open(log_dir+'/args.json', 'w') as out:
         json.dump(vars(args), out, indent=4)
 
@@ -437,6 +445,8 @@ if __name__ == '__main__':
     parser.add_argument('--scale', nargs='?', type=bool,
                         default=False, const=True,
                         help='Rescale to 256x256 augmentation.')
+    parser.add_argument('--seed', nargs='?', type=int, default=1989,
+                        help='Seed for reproducibility')
     args = parser.parse_args()
 
     log_dir = args.log_path + f'/{time_stamp}-{args.arch}/'
@@ -449,4 +459,4 @@ if __name__ == '__main__':
     fh.setFormatter(formatter)
     logger.addHandler(fh)
 
-    train(args, log_dir, writer, logger)
+    train(args, log_dir, writer, logger, args.seed)
