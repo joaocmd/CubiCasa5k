@@ -19,7 +19,9 @@ class DeepLabModel(torch.nn.Module):
         self.model.aux_classifier[4] = nn.Conv2d(256, n_classes, kernel_size=(1, 1), stride=(1, 1))
     
     def forward(self, x):
-        return self.model(x)
+        x = self.model(x)['out']
+        x[:, :21] = torch.sigmoid(x[:, :21])
+        return x
 
 if __name__ == "__main__":
 
@@ -33,4 +35,4 @@ if __name__ == "__main__":
         pred = model(testin)
         # 0: 64x256x256, 1: 128x128x128
         # 2: 256x64x64, 3: 512x32x32, 4: 512x16x16
-        print(pred['out'].shape)
+        print(pred.shape)
