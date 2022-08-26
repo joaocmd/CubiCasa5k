@@ -253,7 +253,7 @@ def train(args, log_dir, writer, logger, seed):
                 no_improvement = 0
             else:
                 no_improvement += 1
-            if no_improvement >= args.patience and optimizer.param_groups[i]['lr'] > args.min_l_rate:
+            if no_improvement >= args.patience and current_lr['base'] > args.min_l_rate:
                 logger.info("No no_improvement for " + str(no_improvement) + " loading last best model and reducing learning rate.")
                 checkpoint = torch.load(log_dir+"/model_best_val_loss_var.pkl")
                 model.load_state_dict(checkpoint['model_state'])
