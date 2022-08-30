@@ -4,6 +4,7 @@ from floortrans.models.dfp_conv import DFPConvModel
 from floortrans.models.dfp_resnet50 import DFPResNet50Model
 from floortrans.models.dfp_resnet50_conv import DFPResNet50ConvModel
 from floortrans.models.dfp_resnet34 import DFPResNet34Model
+from floortrans.models import dfp_resnet34_encoder_conv
 from floortrans.models.dfp_resnet34_conv import DFPResNet34ConvModel
 from floortrans.models.deeplabv3 import DeepLabModel
 
@@ -19,6 +20,8 @@ def get_model(name, n_classes=None, version=None):
         model = DFPResNet34Model(pretrained=True, freeze=False, n_classes=n_classes)
     elif name == 'dfp-resnet34-conv':
         model = DFPResNet34ConvModel(pretrained=True, freeze=False, n_classes=n_classes)
+    elif name == 'dfp-resnet34-encoder-conv':
+        model = dfp_resnet34_encoder_conv.Model(pretrained=True, freeze=False, n_classes=n_classes)
     elif name == 'dfp-resnet50':
         model = DFPResNet50Model(pretrained=True, freeze=False, n_classes=n_classes)
     elif name == 'dfp-resnet50-conv':
