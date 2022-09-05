@@ -1,4 +1,5 @@
 from collections import defaultdict
+from genericpath import exists
 
 import numpy as np
 import pandas as pd
@@ -264,13 +265,14 @@ if __name__ == '__main__':
                         help='# of the epochs')
     parser.add_argument('--weights', nargs='?', type=str, default=None,
                         help='Path to previously trained model weights file .pkl')
-    parser.add_argument('--log-path', nargs='?', type=str, default='runs_cubi/',
+    parser.add_argument('--log-path', nargs='?', type=str, default='runs_cubi',
                         help='Path to log directory')
+    # parser.add_argument('--output-dir', type=str, required=True)
 
     args = parser.parse_args()
 
     log_dir = args.log_path + '/' + time_stamp + '/'
-    os.mkdir(log_dir)
+    os.makedirs(log_dir, exist_ok=True)
     logger = logging.getLogger('eval')
     logger.setLevel(logging.DEBUG)
     fh = logging.FileHandler(log_dir+'/eval.log')
