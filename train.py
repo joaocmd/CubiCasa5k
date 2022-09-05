@@ -25,7 +25,7 @@ from tqdm import tqdm
 
 from floortrans.loaders import FloorplanSVG
 from floortrans.models import get_model
-from floortrans.losses import UncertaintyLoss
+from floortrans.losses import UncertaintyLoss, WeightedUncertaintyLoss
 from floortrans.metrics import get_px_acc, runningScore
 from tensorboardX import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -83,12 +83,10 @@ def train(args, log_dir, writer, logger, seed):
     input_slice = [21, 12, 11]
     if args.arch == 'hg_furukawa_original':
         model = get_model(args.arch, 51)
-        criterion = UncertaintyLoss(input_slice=input_slice)
         if args.furukawa_weights:
             logger.info("Loading furukawa model weights from checkpoint '{}'".format(args.furukawa_weights))
             checkpoint = torch.load(args.furukawa_weights)
             model.load_state_dict(checkpoint['model_state'])
-            criterion.load_state_dict(checkpoint['criterion_state'])
 
         model.conv4_ = torch.nn.Conv2d(256, args.n_classes, bias=True, kernel_size=1)
         model.upsample = torch.nn.ConvTranspose2d(args.n_classes, args.n_classes, kernel_size=4, stride=4)
@@ -98,7 +96,11 @@ def train(args, log_dir, writer, logger, seed):
     else:
         # args.n_classes by default are 44
         model = get_model(args.arch, args.n_classes)
+
+    if args.loss == 'uncertainty':
         criterion = UncertaintyLoss(input_slice=input_slice)
+    elif args.loss == 'weighted':
+        criterion = WeightedUncertaintyLoss(input_slice=input_slice)
 
     model.cuda()
 
@@ -175,7 +177,7 @@ def train(args, log_dir, writer, logger, seed):
                 # whereas labels' dimensions are 16 x 23 x 256 x 256
                 loss = criterion(outputs, labels)
                 lossess.append(loss.item())
-            except:
+            except Exception as e:
                 print("Skipped example...\n\n")
                 optimizer.zero_grad()
                 continue
@@ -400,6 +402,8 @@ if __name__ == '__main__':
                         help='Architecture to use.')
     parser.add_argument('--optimizer', nargs='?', type=str, default='adam-patience-previous-best',
                         help='Optimizer to use [\'adam, sgd\']')
+    parser.add_argument('--loss', nargs='?', type=str, default='uncertainty',
+                        help='Loss function to use [\'uncertainty, weighted\']')
     parser.add_argument('--data-path', nargs='?', type=str, default='data/cubicasa5k/',
                         help='Path to data directory')
     parser.add_argument('--n-classes', nargs='?', type=int, default=44,
