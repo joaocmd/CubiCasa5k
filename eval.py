@@ -167,7 +167,7 @@ def points_no_class_to_csv(points, filename: str, parent_dir: str="."):
     pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
 
 
-def evaluate(args, log_dir, logger):
+def evaluate(args, log_dir, logger, output_dir: str):
 
     normal_set = FloorplanSVG(args.data_path, 'test.txt', format='lmdb', lmdb_folder='cubi_lmdb/',
                               augmentations=Compose([DictToTensor()]), return_heatmaps=True)
@@ -218,7 +218,7 @@ def evaluate(args, log_dir, logger):
             score_junctions_no_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
 
 
-    csv_kwargs = {"parent_dir": "./outputs/results"}
+    csv_kwargs = {"parent_dir": output_dir}
     # Note: Segmentation data is organized as tuples of:
     # (name, res, cls_names: List[str]), where
     # - `name` is the descriptive name of the segmentation
@@ -267,9 +267,11 @@ if __name__ == '__main__':
                         help='Path to previously trained model weights file .pkl')
     parser.add_argument('--log-path', nargs='?', type=str, default='runs_cubi',
                         help='Path to log directory')
-    # parser.add_argument('--output-dir', type=str, required=True)
+    # We need an output dir so that the files do not overwrite each other. 
+    parser.add_argument('--output-dir', type=str, default='outputs/results')
 
     args = parser.parse_args()
+    os.makedirs(args.output_dir, exist_ok=True)
 
     log_dir = args.log_path + '/' + time_stamp + '/'
     os.makedirs(log_dir, exist_ok=True)
@@ -282,6 +284,6 @@ if __name__ == '__main__':
     logger.addHandler(fh)
 
     logger.info(f'Start: {time_stamp}')
-    evaluate(args, log_dir, logger)
+    evaluate(args, log_dir, logger, args.output_dir)
     time_stamp = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
     logger.info(f'End: {time_stamp}')
