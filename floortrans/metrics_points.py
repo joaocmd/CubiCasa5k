@@ -102,8 +102,12 @@ class pointScorePerClass:
     def get_score(self, scores):
         # tp fp gt
         # acc = self.scores[:,0] / (self.scores[:,1] + self.scores[:,2])
-        recall = scores[:,0] / (scores[:,2])
-        precision = scores[:,0] / (scores[:,0] + scores[:,1])
+        lp = (scores[:,2])
+        recall = np.where(lp == 0, np.nan, scores[:,0] / lp)
+
+        # predicted positives
+        pp = (scores[:,0] + scores[:,1])
+        precision = np.where(pp == 0, np.nan, scores[:,0] / pp) 
 
         # acc = np.sum(self.scores[:,0]) / (np.sum(self.scores[:,1]) + np.sum(self.scores[:,2]))
         # acc = np.sum(self.scores[:,0]) / (np.sum(self.scores[:,2]))
