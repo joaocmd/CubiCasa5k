@@ -158,7 +158,7 @@ def extract_local_max(mask_img, info, heatmap_value_threshold=0.2,
 
         points.append([int(x), int(y)] + [info, max_value])
 
-        maximum_suppression(mask, x, y, heatmap_value_threshold)
+        maximum_suppression_iterative(mask, x, y, heatmap_value_threshold)
         if close_point_suppression:
             mask[max(y - gap, 0):min(y + gap, height - 1),
                  max(x - gap, 0):min(x + gap, width - 1)] = 0
@@ -181,6 +181,28 @@ def maximum_suppression(mask, x, y, heatmap_value_threshold):
                                heatmap_value_threshold)
             pass
         continue
+
+def maximum_suppression_iterative(mask, x, y, heatmap_value_threshold):
+    height, width = mask.shape
+
+    stack = [(x, y)]
+    deltas = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    while len(stack) != 0:
+        x, y = stack.pop(0)
+        value = mask[y][x]
+        mask[y][x] = -1
+
+        for delta in deltas:
+            neighbor_x = x + delta[0]
+            neighbor_y = y + delta[1]
+            if neighbor_x < 0 or neighbor_y < 0 or neighbor_x >= width or neighbor_y >= height:
+                continue
+
+            neighbor_value = mask[neighbor_y][neighbor_x]
+
+            if neighbor_value <= value and neighbor_value > heatmap_value_threshold:
+                stack.append((neighbor_x, neighbor_y))
 
 def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44):
     images_val = val['image'].cuda()
