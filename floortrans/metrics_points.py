@@ -55,7 +55,9 @@ class pointScoreNoClass:
         scores = dict()
         for t, val in self.scores.items():
             # tp fp gt
-            scores[t] = {'Recall': val[0]/val[2], 'Precision': val[0]/(val[0] + val[1])}
+            recall = np.nan if val[2] == 0 else val[0]/val[2]
+            precision = np.nan if (val[0] + val[1]) == 0 else val[0] / (val[0] + val[1])
+            scores[t] = {'Recall': recall, 'Precision': precision}
 
         return scores
 
