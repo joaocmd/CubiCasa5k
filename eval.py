@@ -176,14 +176,16 @@ def evaluate(args, log_dir, logger, output_dir: str):
     checkpoint = torch.load(args.weights)
     # Setup Model
     split = [21, 12, 11]
-    if args.arch == 'hg_furukawa_original':
+    if args.arch != 'hg_furukawa_original':
+        print("\n\n\n\n", args.arch)
+        model = get_model(args.arch, args.n_classes)
+    else:
         model = get_model(args.arch, 51)
         model.conv4_ = torch.nn.Conv2d(256, args.n_classes, bias=True, kernel_size=1)
         model.upsample = torch.nn.ConvTranspose2d(args.n_classes, args.n_classes, kernel_size=4, stride=4)
-    else:
-        model = get_model(args.arch, args.n_classes)
-
+    
     model.load_state_dict(checkpoint['model_state'])
+     
     model.eval()
     model.cuda()
 
