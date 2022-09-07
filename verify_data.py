@@ -37,13 +37,14 @@ def verify_example(txt_sample, lmdb_sample, idx=0):
         return updated, new_labels
     return updated, None
 
+# TODO: Add verify the labels are the same!
 
 def main(args, logger):
     logger.info("Opening database...")
-    env = lmdb.open(args.lmdb, map_size=int(200e9))
+    env = lmdb.open(args.lmdb)
 
     logger.info("Creating data loader...")
-    train_data = FloorplanSVG(args.data_path, "correct_examples.txt", format='txt', original_size=True, is_transform=False)
+    train_data = FloorplanSVG(args.data_path, f"{args.split}.txt", format='txt', original_size=True, is_transform=False)
     filepaths = train_data.folders
 
     update_counts = 0
@@ -57,28 +58,22 @@ def main(args, logger):
             data = f.get(key)
 
         if data is not None: # Update
-            logger.info(f'{filepath} already exists')
             lmdb_sample = pickle.loads(data)
             to_update_rooms, update_labels_rooms = verify_example(txt_sample, lmdb_sample, idx=0)
             if to_update_rooms:
-                    logger.info(f'--> Update rooms')
-                    lmdb_sample["label"][0] = torch.from_numpy(update_labels_rooms).to(lmdb_sample["label"][0])
+                    logger.info(f'--> Update rooms for {filepath}')
+                    #lmdb_sample["label"][0] = torch.from_numpy(update_labels_rooms).to(lmdb_sample["label"][0])
         
             to_update_icons, update_labels_icons = verify_example(txt_sample, lmdb_sample, idx=1)
             if to_update_icons:
-                    logger.info(f'--> Update icons')
-                    lmdb_sample["label"][1] = torch.from_numpy(update_labels_icons).to(lmdb_sample["label"][1])
+                    logger.info(f'--> Update rooms for {filepath}')
+                    #lmdb_sample["label"][1] = torch.from_numpy(update_labels_icons).to(lmdb_sample["label"][1])
                     
-
             if to_update_rooms or to_update_icons:
                 logger.info(f'--> Update labels: {lmdb_sample["label"].shape}')
-                with env.begin(write=True) as trx:
-                    trx.put(key, pickle.dumps(lmdb_sample))
                 update_counts += 1
         else:
-            logger.info(f"Adding {filepath}")
-            with env.begin(write=True, buffers=True) as trx:
-                trx.put(key, pickle.dumps(txt_sample))
+            logger.info(f"Missing from database {filepath}")
             new_counts += 1
 
     logger.info(f"Total new: {new_counts}, updates: {update_counts}")
@@ -91,6 +86,8 @@ if __name__ == '__main__':
                         default='data/cubicasa5k/cubi_lmdb/', help='Path to lmdb')
     parser.add_argument('--data-path', nargs='?', type=str, default='data/cubicasa5k/',
                         help='Path to data directory')
+    parser.add_argument('--split', nargs='?', type=str, required=True,
+                    help='Split to run the verifier for')
     parser.add_argument('--log-path', nargs='?', type=str, default='runs_cubi/',
                         help='Path to log directory')
     args = parser.parse_args()
