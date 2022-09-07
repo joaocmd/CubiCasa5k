@@ -18,6 +18,7 @@ class WeightedUncertaintyLoss(Module):
         self.mask = mask
         self.sub = sub
         self.cuda = cuda
+        self.device = "gpu" if self.cuda else "cpu"
         self.log_vars = Parameter(torch.tensor([0, 0], requires_grad=True, dtype=torch.float32).cuda())
         self.log_vars_mse = Parameter(torch.zeros(input_slice[0], requires_grad=True, dtype=torch.float32).cuda())
 
