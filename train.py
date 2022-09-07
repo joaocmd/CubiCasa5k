@@ -10,6 +10,7 @@ import torch.nn.functional as F
 import numpy as np
 import pandas as pd
 import random
+import traceback
 
 from datetime import datetime
 from floortrans.loaders.augmentations import (RandomCropToSizeTorch,
@@ -100,6 +101,7 @@ def train(args, log_dir, writer, logger, seed):
     if args.loss == 'uncertainty':
         criterion = UncertaintyLoss(input_slice=input_slice)
     elif args.loss == 'weighted':
+        print("\n\n\n\n\n", "WEIGHTED LOSS FOR SURE!", "MODEL", args.arch, "\n\n\n\n\n")
         criterion = WeightedUncertaintyLoss(input_slice=input_slice)
 
     model.cuda()
@@ -179,6 +181,7 @@ def train(args, log_dir, writer, logger, seed):
                 lossess.append(loss.item())
             except Exception as e:
                 print("Skipped example...\n\n")
+                traceback.print_exc()
                 optimizer.zero_grad()
                 continue
             losses = pd.concat([losses, criterion.get_loss()], ignore_index=True)
