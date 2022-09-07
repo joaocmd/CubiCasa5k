@@ -17,5 +17,6 @@ runs_cubi
 cubicasa5k.zip
 data/cubicasa5k
 experiment1-uncertainty-loss/
+experiment2-weighted-loss/
 output/
 model_best_val_loss_var.pkl
