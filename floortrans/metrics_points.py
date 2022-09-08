@@ -33,7 +33,7 @@ class pointScoreNoClass:
 
         pairs = itertools.product(all_predicted, all_gt)
         pairs = ([pair, sqrdistance(pair[0], pair[1])] for pair in pairs)
-        pairs = (x for x in pairs if x[1] < distance_threshold)
+        pairs = (x for x in pairs if x[1] < distance_threshold**2)
         pairs = sorted(pairs, key=lambda p: p[1])
         pairs = [[point(p[0][0]), point(p[0][1])] for p in pairs]
         
@@ -85,7 +85,7 @@ class pointScorePerClass:
             for pt in pts_pred:
                 p, distance = min([[p, sqrdistance(p, pt)] for p in pts_gt], key=lambda p: p[1])
 
-                if distance < distance_threshold:
+                if distance < distance_threshold**2:
                     values[k][0] += 1
                     values[k][1] -= 1
                     pts_gt.remove(p)
@@ -140,7 +140,7 @@ class pointScoreMixed:
 
         pairs = itertools.product(all_predicted, all_gt)
         pairs = ([pair, sqrdistance(pair[0], pair[1])] for pair in pairs)
-        pairs = (x for x in pairs if x[1] < distance_threshold)
+        pairs = (x for x in pairs if x[1] < distance_threshold**2)
         pairs = sorted(pairs, key=lambda p: p[1])
         
         remaining_pred = set(all_predicted)
