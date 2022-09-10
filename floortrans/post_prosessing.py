@@ -1071,7 +1071,7 @@ def extract_local_max(mask_img, num_points, info, heatmap_value_threshold=0.5,
 
         points.append([int(x), int(y)] + info + [max_value, ])
 
-        maximum_suppression(mask, x, y, heatmap_value_threshold)
+        maximum_suppression_iterative(mask, x, y, heatmap_value_threshold)
         if close_point_suppression:
             mask[max(y - gap, 0):min(y + gap, height - 1),
                  max(x - gap, 0):min(x + gap, width - 1)] = 0
@@ -1095,6 +1095,32 @@ def maximum_suppression(mask, x, y, heatmap_value_threshold):
                                heatmap_value_threshold)
             pass
         continue
+
+# Update 2022/09/09, Bug fix related to max depth achieved.
+# Is meant to be used wherever maximum_suppression was previously called.
+def maximum_suppression_iterative(mask, x, y, heatmap_value_threshold):
+    height, width = mask.shape
+
+    stack = [(x, y)]
+    deltas = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    while len(stack) != 0:
+        x, y = stack.pop(0)
+        value = mask[y][x]
+        if value == -1:
+            continue
+        mask[y][x] = -1
+
+        for delta in deltas:
+            neighbor_x = x + delta[0]
+            neighbor_y = y + delta[1]
+            if neighbor_x < 0 or neighbor_y < 0 or neighbor_x >= width or neighbor_y >= height:
+                continue
+
+            neighbor_value = mask[neighbor_y][neighbor_x]
+
+            if neighbor_value <= value and neighbor_value > heatmap_value_threshold:
+                stack.append((neighbor_x, neighbor_y))
 
 
 def calc_point_info(points, gap, point_orientations, orientation_ranges, 

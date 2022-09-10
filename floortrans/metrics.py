@@ -191,6 +191,8 @@ def maximum_suppression_iterative(mask, x, y, heatmap_value_threshold):
     while len(stack) != 0:
         x, y = stack.pop(0)
         value = mask[y][x]
+        if value == -1:
+            continue
         mask[y][x] = -1
 
         for delta in deltas:
@@ -246,7 +248,16 @@ def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44)
 
     all_opening_types = [1, 2]  # Window, Door
     polygons, types, room_polygons, room_types, _ = post_prosessing.get_polygons(
-        (heatmaps, rooms, icons), 0.4, all_opening_types)
+        # ------------------------------------------------------------------
+        # Update 2022/09/09: This method keeps breaking w/ max depth recursion
+        # we'll update both the threshold (forcing it to prune branches)
+        # sooner, and also use an iterative version of the recursive
+        # rationale, with a max depth call of 999, after which we assume
+        # there's no pixel that satisfies this threshold.
+        # ------------------------------------------------------------------
+        # (heatmaps, rooms, icons), 0.4, all_opening_types)
+        (heatmaps, rooms, icons), 0.9, all_opening_types)
+
     logger.info("Prediction post processing done")
 
     predicted_classes = polygons_to_tensor(
