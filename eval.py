@@ -55,7 +55,7 @@ def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
     # 1. Create file with overall results of segmentation
     # -----------------------------------------------------------------
     global_results = defaultdict(list)
-    for name, res, _ in data:
+    for name, res, _ in data[:-1]:
         global_results["name"].append(name)
 
         # first element in the ``res`` tuple contains the overall results
@@ -71,7 +71,7 @@ def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
     # -----------------------------------------------------------------
     class_results = defaultdict(list)
 
-    for name, res, class_names in data:
+    for name, res, class_names in data[:-1]:
         # second element in the ``res`` tuple contains the class results
         class_res = res[1]
         class_results["name"].extend([name] * len(class_names))
@@ -89,6 +89,14 @@ def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
     # Dump to file
     pd.DataFrame(class_results).to_csv(f"{parent_dir}/{filename}_by_class.csv", index=False)
 
+    # -----------------------------------------------------------------
+    # 3. Create file with just MAE for heatmap prediction
+    # -----------------------------------------------------------------
+    global_results = defaultdict(list)
+    name, res = data[-1]
+    global_results["name"].append(name)
+    global_results[metric].append(metric_value)
+    pd.DataFrame(global_results).to_csv(f"{parent_dir}/{filename}_heatmaps.csv", index=False)
 
 def points_per_class_to_csv(
         points: Dict[int, dict],
@@ -197,13 +205,15 @@ def evaluate(args, log_dir, logger, output_dir: str):
     score_junctions_mixed = pointScoreMixed(13)
     score_junctions_no_class = pointScoreNoClass()
 
+    absolute_error = n_heatmap_pixels = 0
+
     with torch.no_grad():
         for count, val in tqdm(enumerate(data_loader), total=len(data_loader),
                                ncols=80, leave=False):
             logger.info(f'{count} - {val["folder"]}')
             things = get_evaluation_tensors(val, model, split, logger, rotate=True)
 
-            label, segmentation, pol_segmentation, junctions, pred_junctions = things
+            label, segmentation, pol_segmentation, junctions, pred_junctions, heatmap_error = things
 
             score_seg_room.update(label[0], segmentation[0])
             score_seg_icon.update(label[1], segmentation[1])
@@ -219,6 +229,9 @@ def evaluate(args, log_dir, logger, output_dir: str):
             score_junctions_mixed.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
             score_junctions_no_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
 
+            absolute_error += heatmap_error
+            n_heatmap_pixels += val['label'][0][:21].numel()
+
 
     csv_kwargs = {"parent_dir": output_dir}
     # Note: Segmentation data is organized as tuples of:
@@ -233,6 +246,7 @@ def evaluate(args, log_dir, logger, output_dir: str):
         ("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls), 
         ("Icon segmentation", score_seg_icon.get_scores(), icon_cls), 
         ("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls),
+        ("Heatmap MAE", absolute_error/n_heatmap_pixels),
     )
     res_to_csv(segmentation_data, filename="segmentation", **csv_kwargs)
 

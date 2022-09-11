@@ -237,7 +237,7 @@ def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44)
 
         prediction = torch.mean(prediction, 0, True)
     else:
-        prediction = model(images_val)
+        prediction = model(images_val).cpu()
 
     heatmaps, rooms, icons = post_prosessing.split_prediction(
         prediction, img_size, split)
@@ -265,9 +265,12 @@ def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44)
     
     pol_rooms = np.argmax(predicted_classes[:split[1]], axis=0)
     pol_icons = np.argmax(predicted_classes[split[1]:], axis=0)
+
+    heatmap_error = np.abs(heatmaps - labels_val[0][:21].numpy()).sum()
     
     return (labels_val[0, 21:].data.numpy(),
             np.concatenate(([rooms_seg], [icons_seg]), axis=0),
             np.concatenate(([pol_rooms], [pol_icons]), axis=0),
             junctions_val,
-            predicted_points)
+            predicted_points,
+            heatmap_error)
