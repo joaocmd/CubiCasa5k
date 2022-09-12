@@ -93,9 +93,9 @@ def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
     # 3. Create file with just MAE for heatmap prediction
     # -----------------------------------------------------------------
     global_results = defaultdict(list)
-    name, res = data[-1]
+    name, mean_iou = data[-1]
     global_results["name"].append(name)
-    global_results[metric].append(metric_value)
+    global_results["Mean IoU"].append(mean_iou)
     pd.DataFrame(global_results).to_csv(f"{parent_dir}/{filename}_heatmaps.csv", index=False)
 
 def points_per_class_to_csv(
@@ -246,7 +246,7 @@ def evaluate(args, log_dir, logger, output_dir: str):
         ("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls), 
         ("Icon segmentation", score_seg_icon.get_scores(), icon_cls), 
         ("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls),
-        ("Heatmap MAE", absolute_error/n_heatmap_pixels),
+        ("Junction Prediction", absolute_error/n_heatmap_pixels),
     )
     res_to_csv(segmentation_data, filename="segmentation", **csv_kwargs)
 
