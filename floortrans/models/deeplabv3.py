@@ -5,7 +5,7 @@ import torch.nn as nn
 from torchvision.models.segmentation import deeplabv3_resnet50, DeepLabV3_ResNet50_Weights
 
 
-class DeepLabModel(torch.nn.Module):
+class Model(torch.nn.Module):
     def __init__(self, pretrained: bool=True, n_classes: int=44, device="cpu"):
         super().__init__()
         self.device = device
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         testin = torch.randn(1, 3, 512, 512, device="cuda")
         # testin = torch.randn(1, 3, 1213, 956, device="cuda")
-        model = DeepLabModel(n_classes=44, device="cuda")
+        model = Model(n_classes=44, device="cuda")
         model.cuda()
         model.eval()
         ### Shared VGG encoder

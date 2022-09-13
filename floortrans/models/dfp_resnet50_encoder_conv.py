@@ -73,7 +73,7 @@ class Model(torch.nn.Module):
         # (rbgrs) to obtain the final representation.
         # ----------------------------------------------------
         # List of channel dimensions per layer 
-        rblist = [512, 256, 128, 64, 64, 3]
+        rblist = [2048, 1024, 512, 64, 64, 3]
         # ^Note: Last layer size equals number of RB classes: walls, doors, windows
 
         # *rbtrans*: VGG decoder that will be used to output the classes
@@ -92,7 +92,7 @@ class Model(torch.nn.Module):
         # ----------------------------------------------------
         # 3. Room Type Prediction 
         # ----------------------------------------------------
-        rtlist = [512, 256, 128, 64, 64]
+        rtlist = [2048, 1024, 512, 64, 64]
 
         # *rttrans*: VGG decoder 
         self.rttrans = nn.ModuleList([self._transconv2d(
@@ -109,7 +109,7 @@ class Model(torch.nn.Module):
         # 4. Attention Mechanism 
         # ----------------------------------------------------
         # Attention Non-local context
-        clist = [256, 128, 64, 64]
+        clist = [1024, 512, 64, 64]
         self.ac1s = nn.ModuleList(self._conv2d(
             clist[i], clist[i], 3, 1, 1) for i in range(len(clist)))
         self.ac2s = nn.ModuleList(self._conv2d(
@@ -165,8 +165,8 @@ class Model(torch.nn.Module):
     def _initializeVGG(self, pretrained: bool, freeze: bool):
         """Initialize the VGG encoder model."""
         # encmodel = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
-        encmodel = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
-        # encmodel = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None)
+        # encmodel = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
+        encmodel = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None)
 
         if freeze:
             for child in encmodel.children():
@@ -369,8 +369,8 @@ class Model(torch.nn.Module):
 if __name__ == "__main__":
 
     with torch.no_grad():
-        testin = torch.randn(1, 3, 512, 512, device="cuda")
-        # testin = torch.randn(1, 3, 1213, 956, device="cuda")
+        # testin = torch.randn(1, 3, 512, 512, device="cuda")
+        testin = torch.randn(1, 3, 1213, 956, device="cuda")
         model = Model(device="cuda")
         model.cuda()
         model.eval()

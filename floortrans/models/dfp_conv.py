@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 
 
-class DFPConvModel(torch.nn.Module):
+class Model(torch.nn.Module):
     """Model of the Deep FloorPlan Recognition [1].
 
     Receives images as inputs and outputs the pixel-wise classification concerning
@@ -370,7 +370,7 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         testin = torch.randn(1, 3, 1319, 619, device="cuda")
-        model = DFPConvModel()
+        model = Model(device="cuda")
         model.cuda()
         model.eval()
         ### Shared VGG encoder
