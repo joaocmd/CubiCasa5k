@@ -50,9 +50,9 @@ class DFPResNet34ConvModel(torch.nn.Module):
     1 - https://arxiv.org/pdf/1908.11025.pdf
     2 - https://github.com/zcemycl/PyTorch-DeepFloorplan/blob/main/net.py
     """
-    def __init__(self, pretrained: bool=True, freeze: bool=True, n_classes: int=44):
+    def __init__(self, pretrained: bool=True, freeze: bool=True, n_classes: int=44, device="cpu"):
         super().__init__()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(device)
         self.n_classes = n_classes
         # ----------------------------------------------------
         # 1. Initialize VGG encoder (component 1)

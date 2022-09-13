@@ -7,7 +7,7 @@ import pandas as pd
 class UncertaintyLoss(Module):
     def __init__(self, input_slice=[21, 13, 17],
                  target_slice=[21, 1, 1], sub=0,
-                 cuda=True, mask=False):
+                 device="cpu", mask=False):
         super(UncertaintyLoss, self).__init__()
         self.input_slice = input_slice
         self.target_slice = target_slice
@@ -17,9 +17,9 @@ class UncertaintyLoss(Module):
         self.loss_heatmap = None
         self.mask = mask
         self.sub = sub
-        self.cuda = cuda
-        self.log_vars = Parameter(torch.tensor([0, 0], requires_grad=True, dtype=torch.float32).cuda())
-        self.log_vars_mse = Parameter(torch.zeros(input_slice[0], requires_grad=True, dtype=torch.float32).cuda())
+        self.device = device
+        self.log_vars = Parameter(torch.tensor([0, 0], requires_grad=True, dtype=torch.float32).to(device))
+        self.log_vars_mse = Parameter(torch.zeros(input_slice[0], requires_grad=True, dtype=torch.float32).to(device))
 
     def forward(self, input, target):
         n, c, h, w = input.size()
@@ -30,17 +30,18 @@ class UncertaintyLoss(Module):
             target = target.squeeze(1)
 
         pred_arr = torch.split(input, self.input_slice, 1)
-        heatmap_pred, rooms_pred, icons_pred = pred_arr
+        heatmap_pred, rooms_pred, icons_pred = [p.to(self.device) for p in pred_arr]
+
 
         target_arr = torch.split(target, self.target_slice, 1)
-        heatmap_target, rooms_target, icons_target = target_arr
-
+        heatmap_target, rooms_target, icons_target = [a.to(self.device) for a in target_arr]
+        
         # removing empty dimension if batch size is 1
         rooms_target = torch.squeeze(rooms_target, 1)
         icons_target = torch.squeeze(icons_target, 1)
 
         # Segmentation labels to correct type
-        if self.cuda:
+        if self.device.startswith("cuda"):
             rooms_target = rooms_target.type(torch.cuda.LongTensor) - self.sub
             icons_target = icons_target.type(torch.cuda.LongTensor) - self.sub
         else:
@@ -121,11 +122,11 @@ class UncertaintyLoss(Module):
     def get_s(self):
         s = self.log_vars.data
         mse_s = self.log_vars_mse.data
-        d = {'room s': [s[0].cuda()],
-             'icon s': [s[1].cuda()]}
+        d = {'room s': [s[0].to(self.device)],
+             'icon s': [s[1].to(self.device)]}
         for i, m in enumerate(mse_s):
             key = 'heatmap s' + str(i)
-            d[key] = [m.cuda()]
+            d[key] = [m.to(self.device)]
 
         return pd.DataFrame(data={k: [e.cpu() for e in d[k]] for k in d})
 

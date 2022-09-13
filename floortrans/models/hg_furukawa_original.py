@@ -52,7 +52,7 @@ class Residual(nn.Module):
 
 
 class hg_furukawa_original(nn.Module):
-    def __init__(self, n_classes):
+    def __init__(self, n_classes, device="cpu"):
         super(hg_furukawa_original, self).__init__()
         self.conv1_ = nn.Conv2d(
             3, 64, bias=True, kernel_size=7, stride=2, padding=3)

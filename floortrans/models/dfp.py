@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from torchvision import models
 
 class DFPmodel(torch.nn.Module):
-    def __init__(self, pretrained=True, freeze=True):
+    def __init__(self, pretrained=True, freeze=True, device="cpu"):
         super(DFPmodel, self).__init__()
-        self.device="cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        torch.device(device)
         self._initializeVGG(pretrained, freeze)
 
         ### Room Boundary Prediction

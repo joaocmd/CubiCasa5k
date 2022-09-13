@@ -40,7 +40,10 @@ def set_all_seeds(seed: int=1234):
     np.random.seed(seed)
 
 
-def train(args, log_dir, writer, logger, seed):
+def train(args, log_dir, writer, logger, seed, device="cpu"):
+    if device is None:
+        print(device)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     set_all_seeds(seed)
     with open(log_dir+'/args.json', 'w') as out:
         json.dump(vars(args), out, indent=4)
@@ -83,7 +86,7 @@ def train(args, log_dir, writer, logger, seed):
     logging.info('Loading model...')
     input_slice = [21, 12, 11]
     if args.arch == 'hg_furukawa_original':
-        model = get_model(args.arch, 51)
+        model = get_model(args.arch, 51, device=device)
         if args.furukawa_weights:
             logger.info("Loading furukawa model weights from checkpoint '{}'".format(args.furukawa_weights))
             checkpoint = torch.load(args.furukawa_weights)
@@ -96,7 +99,7 @@ def train(args, log_dir, writer, logger, seed):
             nn.init.constant_(m.bias, 0)
     else:
         # args.n_classes by default are 44
-        model = get_model(args.arch, args.n_classes)
+        model = get_model(args.arch, args.n_classes, device=device)
 
     if args.loss == 'uncertainty':
         criterion = UncertaintyLoss(input_slice=input_slice)
@@ -104,10 +107,10 @@ def train(args, log_dir, writer, logger, seed):
         print("\n\n\n\n\n", "WEIGHTED LOSS FOR SURE!", "MODEL", args.arch, "\n\n\n\n\n")
         criterion = WeightedUncertaintyLoss(input_slice=input_slice)
 
-    model.cuda()
+    model.to(device)
 
     # Drawing graph for TensorBoard
-    dummy = torch.zeros((2, 3, args.image_size, args.image_size)).cuda()
+    # dummy = torch.zeros((2, 3, args.image_size, args.image_size)).to(device, )
     # model(dummy)
     # writer.add_graph(model, dummy)
 
@@ -168,8 +171,8 @@ def train(args, log_dir, writer, logger, seed):
         # Training
         for i, samples in tqdm(enumerate(trainloader), total=len(trainloader),
                                ncols=80, leave=False):
-            images = samples['image'].cuda(non_blocking=True)
-            labels = samples['label'].cuda(non_blocking=True)
+            images = samples['image'].to(device, non_blocking=True)
+            labels = samples['label'].to(device, non_blocking=True)
 
             try:
                 outputs = model(images)
@@ -220,8 +223,8 @@ def train(args, log_dir, writer, logger, seed):
         total_px = 0
         for i_val, samples_val in tqdm(enumerate(valloader), total=len(valloader), ncols=80, leave=False):
             with torch.no_grad():
-                images_val = samples_val['image'].cuda(non_blocking=True)
-                labels_val = samples_val['label'].cuda(non_blocking=True)
+                images_val = samples_val['image'].to(device, non_blocking=True)
+                labels_val = samples_val['label'].to(device, non_blocking=True)
 
                 outputs = model(images_val)
                 labels_val = F.interpolate(labels_val, size=outputs.shape[2:], mode='bilinear', align_corners=False)
@@ -312,8 +315,8 @@ def train(args, log_dir, writer, logger, seed):
                         if i == 4:
                             break
 
-                        images_val = samples_val['image'].cuda(non_blocking=True)
-                        labels_val = samples_val['label'].cuda(non_blocking=True)
+                        images_val = samples_val['image'].to(device, non_blocking=True)
+                        labels_val = samples_val['label'].to(device, non_blocking=True)
 
                         if first_best:
                             # save image and label
@@ -454,8 +457,9 @@ if __name__ == '__main__':
                         help='Rescale to 256x256 augmentation.')
     parser.add_argument('--seed', nargs='?', type=int, default=1989,
                         help='Seed for reproducibility')
+    parser.add_argument('--device', type=str, default=None)
+    
     args = parser.parse_args()
-
     log_dir = args.log_path + f'/{time_stamp}-{args.arch}/'
     writer = SummaryWriter(log_dir)
     logger = logging.getLogger('train')
@@ -466,4 +470,4 @@ if __name__ == '__main__':
     fh.setFormatter(formatter)
     logger.addHandler(fh)
 
-    train(args, log_dir, writer, logger, args.seed)
+    train(args, log_dir, writer, logger, args.seed, device=args.device)
