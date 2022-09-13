@@ -50,10 +50,11 @@ class Model(torch.nn.Module):
     1 - https://arxiv.org/pdf/1908.11025.pdf
     2 - https://github.com/zcemycl/PyTorch-DeepFloorplan/blob/main/net.py
     """
-    def __init__(self, pretrained: bool=True, freeze: bool=True, n_classes: int=44, device="cpu"):
+    def __init__(self, pretrained: bool=True, freeze: bool=True, n_classes: int=44, last_conv=False, device="cpu"):
         super().__init__()
         self.device = torch.device(device)
         self.n_classes = n_classes
+        self.last_conv = last_conv
         # ----------------------------------------------------
         # 1. Initialize VGG encoder (component 1)
         # ----------------------------------------------------
@@ -308,7 +309,8 @@ class Model(torch.nn.Module):
         rb_outputs = self.rbconvs[-1](x)
         # Resize to H x W
         logits_rb = F.interpolate(rb_outputs, size=(H, W))
-        logits_rb = self.rblastconv(logits_rb)
+        if self.last_conv:
+            logits_rb = self.rblastconv(logits_rb)
         
         # ------------------------------------------------
         # Room Type prediction
@@ -338,7 +340,8 @@ class Model(torch.nn.Module):
             x = self.non_local_context(rbfeatures[j], x, j)
         
         logits_other = F.interpolate(self.last(x), size=(H, W)) # 16 x 41 x 128 x 128 --> 16 x 41 x 256 x 256
-        logits_other = self.rtlastconv(logits_other)
+        if self.last_conv:
+            logits_other = self.rtlastconv(logits_other)
         # Update: @joao ----------------------------------------------------
         # We have three tasks in total: 1x regression + 2 multi-class
         # 1. **Regression tasks** (21) for the junctions heatmaps. These are
