@@ -308,6 +308,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
                      'optimizer_state': optimizer.state_dict(),
                      'best_loss': best_loss}
             torch.save(state, log_dir+"/model_best_val_loss_var.pkl")
+            open(log_dir+f"/model_best_val_loss_var-epoch={epoch+1}-loss={best_loss_var}", "w").close()
             # Making example prediction images to TensorBoard
             if args.plot_samples:
                 for i, samples_val in enumerate(valloader):
@@ -373,6 +374,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
                      'optimizer_state': optimizer.state_dict(),
                      'best_loss': best_loss}
             torch.save(state, log_dir+"/model_best_val_loss.pkl")
+            open(log_dir+f"/model_best_val_loss-epoch={epoch+1}-loss={best_loss}", "w").close()
 
         px_acc = room_score["Mean Acc"] + icon_score["Mean Acc"]
         if px_acc > best_acc:
@@ -383,6 +385,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
                      'criterion_state': criterion.state_dict(),
                      'optimizer_state': optimizer.state_dict()}
             torch.save(state, log_dir+"/model_best_val_acc.pkl")
+            open(log_dir+f"/model_best_val_loss-epoch={epoch+1}-acc={best_acc}", "w").close()
 
         if avg_loss < best_train_loss:
             best_train_loss = avg_loss
@@ -392,6 +395,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
                      'criterion_state': criterion.state_dict(),
                      'optimizer_state': optimizer.state_dict()}
             torch.save(state, log_dir+"/model_best_train_loss_var.pkl")
+            open(log_dir+f"/model_best_train_loss-epoch={epoch+1}-loss={best_train_loss}", "w").close()
 
     logger.info("Last epoch done saving final model...")
     state = {'epoch': epoch+1,
@@ -399,6 +403,8 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
              'criterion_state': criterion.state_dict(),
              'optimizer_state': optimizer.state_dict()}
     torch.save(state, log_dir+"/model_last_epoch.pkl")
+    os.remove(log_dir + f"/model_last_epoch-{epoch}")
+    open(log_dir+f"/model_last_epoch-{epoch+1}", "w").close()
 
 
 if __name__ == '__main__':
