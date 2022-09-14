@@ -634,7 +634,7 @@ class ResizePaddedTorch(object):
         img_s = torch.tensor(img.shape[1:], dtype=self.dtype)
         interm_shape = (ratio * img_s).ceil()
 
-        interm_shape = [interm_shape[0], interm_shape[1]]
+        interm_shape = [interm_shape[0].int().item(), interm_shape[1].int().item()]
 
         img = img.unsqueeze(0)
         interm_img = torch.nn.functional.interpolate(img, size=interm_shape, mode=mode, align_corners=aling_corners)
