@@ -137,7 +137,7 @@ def extract_points(heatmaps, threshold = 0.09):
         p = extract_local_max(heatmaps[i], info, threshold, close_point_suppression=True)
         points[i] = p
 
-    points[-1] = extract_local_max(np.max(heatmaps[:13], axis=0), -1, 0.2, close_point_suppression=True)
+    points[-1] = extract_local_max(np.max(heatmaps[:13], axis=0), -1, threshold, close_point_suppression=True)
     return points
 
 def extract_local_max(mask_img, info, heatmap_value_threshold=0.2,
