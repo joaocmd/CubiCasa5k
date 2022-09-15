@@ -72,6 +72,7 @@ class pointScorePerClass:
             self.scores[t] = self.update_one(gt, filter_points(predicted, t/100), distance_threshold, self.scores[t])
 
     def update_one(self, gt, predicted, distance_threshold, values):
+        # There are 12 junction types, n_classes is 13 because, so -1 is ignored
         for k in range(self.n_classes):
             pts_gt = [tuple(pt) for pt in gt[k]]
             pts_pred = predicted[k][:]
