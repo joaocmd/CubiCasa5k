@@ -142,7 +142,7 @@ class pointScoreMixed:
         pairs = itertools.product(all_predicted, all_gt)
         pairs = ([pair, sqrdistance(pair[0], pair[1])] for pair in pairs)
         pairs = (x for x in pairs if x[1] < distance_threshold**2)
-        pairs = sorted(pairs, key=lambda p: p[1])
+        pairs = sorted(pairs, key=lambda p: (p[1], p[0][2] != p[0][2])) # the second sort terms prioritizes points with similar classes
         
         remaining_pred = set(all_predicted)
         remaining_gt = set(all_gt)
