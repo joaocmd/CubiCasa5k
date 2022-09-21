@@ -73,6 +73,8 @@ Trained for 40 minutes (24 epochs), best epoch was 8:
 
 val_loss = 0.436
 val_acc = 0.871
+val times: [203.65784907341003, 106.63812565803528, 104.3677442073822, 105.49284291267395, 106.480886220932, 104.05868077278137]
+105.40765595436096 +- 1.0558680027951637
 
 (averaged over 5 runs)
 Test: 5879 examples (184 batches of 32) - 11.3s
@@ -87,10 +89,13 @@ precision,69.35,65.38,75.73,90.38,83.76,97.95,96.92,90.28,97.10,93.78,93.95,93.0
 
 # ConvNeXt trained end-to-end single FC layer all classes
 
+
 Trained for 36 minutes (14 epochs), best epoch was 5:
 
 val_loss = 0.334
 val_acc = 0.909
+val times: [171.3303620815277, 140.91314601898193, 144.01141595840454, 140.46311616897583, 137.57993960380554, 164.9966802597046]
+145.59285960197448 +-9.91393054161098
 
 (averaged over 5 runs)
 Test: 5879 examples (184 batches of 32) - 13.2s
@@ -103,12 +108,19 @@ class,none,slide,rollup,none,double_d,double_u,opposite_ul_dl,opposite_ul_dr,opp
 accuracy,66.80,70.45,77.08,91.67,91.67,93.75,91.03,92.31,95.92,97.39,97.93,97.04,98.46
 precision,78.02,67.83,77.89,90.83,87.61,97.18,97.26,98.63,97.25,95.55,94.53,94.47,94.02
 
+validation:
+class,none,slide,rollup,double_r,double_f,opposite_lf_lr,opposite_lf_rr,opposite_rf_lr,opposite_rf_rr,single_lr,single_rr,single_lf,single_rf
+accuracy,76.18,71.98,71.05,83.59,84.38,96.10,100.00,100.00,96.10,95.66,94.96,95.38,96.58
+precision,75.78,65.99,85.71,90.68,92.31,99.05,100.00,95.24,98.13,96.01,95.19,95.38,94.20
+
 # EfficientNetV2-S trained end-to-end single FC layer all classes
 
 Trained for 30 minutes (24 epochs), best epoch was 1:
 
 val_loss = 0.387
 val_acc = 0.893
+val times: [236.63591074943542, 236.8429253101349, 266.3912160396576, 246.33673238754272, 263.2558650970459, 254.34984159469604]
+253.43531608581543 10.870438864890527
 
 (averaged over 5 runs)
 Test: 5879 examples (184 batches of 32) - 14.8s 
