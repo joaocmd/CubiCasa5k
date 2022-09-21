@@ -129,7 +129,7 @@ def polygons_to_tensor(polygons_val, types_val, room_polygons_val, room_types_va
     return ten
 
 
-def extract_points(heatmaps, threshold = 0.09):
+def extract_points(heatmaps, threshold = 0.05):
     points = {}
     for i in range(len(heatmaps)):
         # info = [int(i / 4), int(i % 4)]
