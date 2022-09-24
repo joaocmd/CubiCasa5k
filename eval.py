@@ -23,9 +23,9 @@ icon_cls = ["Empty", "Window", "Door", "Closet", "Electr. Appl.", "Toilet", "Sin
 
 def res_to_csv(data: Tuple, filename: str, parent_dir: str="."):
     """Dump segmentation results to CSV files.
-    
+
     It creates two different files at the specified ``parent_dir`` under
-    the provided ``filename`` and with suffixes ``_by_class`` or 
+    the provided ``filename`` and with suffixes ``_by_class`` or
     ``_global``, depending on whether it represents the overall results
     of the segmentation or it refers to the results discriminated by class.
 
@@ -109,7 +109,7 @@ def points_per_class_to_csv(
 
     for threshold, metric_values in points.items():
         # metric_values = {
-        #   'Per_class': {'Recall': recall, 'Precision': precision}, 
+        #   'Per_class': {'Recall': recall, 'Precision': precision},
         #   'Overall': {'Recall': avg_recall, 'Precision': avg_precision}
         # }
 
@@ -143,7 +143,7 @@ def points_per_class_to_csv(
 
 def points_mixed_to_csv(
     points: Dict[int, dict],
-    class_names: List[str], 
+    class_names: List[str],
     filename: str,
     parent_dir: str=".",
 ):
@@ -177,7 +177,7 @@ def points_no_class_to_csv(points, filename: str, parent_dir: str="."):
 
 def evaluate(args, log_dir, logger, output_dir: str):
 
-    normal_set = FloorplanSVG(args.data_path, 'test.txt', format='lmdb', lmdb_folder='cubi_lmdb/',
+    normal_set = FloorplanSVG(args.data_path, args.split, format='lmdb', lmdb_folder='cubi_lmdb/',
                               augmentations=Compose([DictToTensor()]), return_heatmaps=True)
     data_loader = data.DataLoader(normal_set, batch_size=1, num_workers=0)
 
@@ -191,9 +191,9 @@ def evaluate(args, log_dir, logger, output_dir: str):
         model = get_model(args.arch, 51)
         model.conv4_ = torch.nn.Conv2d(256, args.n_classes, bias=True, kernel_size=1)
         model.upsample = torch.nn.ConvTranspose2d(args.n_classes, args.n_classes, kernel_size=4, stride=4)
-    
+
     model.load_state_dict(checkpoint['model_state'])
-     
+
     model.eval()
     model.cuda()
 
@@ -240,11 +240,11 @@ def evaluate(args, log_dir, logger, output_dir: str):
     # - `res` is a 2-dim tuple with the following format:
     #    {"Overall Acc": v1, "Mean Acc": v2, "FreqW Acc": v3, "Mean IoU": v4},
     #    { "Class IoU": List[values], "Class Acc": List[values], }
-    # 
+    #
     segmentation_data = (
-        ("Room segmentation", score_seg_room.get_scores(), room_cls), 
-        ("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls), 
-        ("Icon segmentation", score_seg_icon.get_scores(), icon_cls), 
+        ("Room segmentation", score_seg_room.get_scores(), room_cls),
+        ("Room polygon segmentation", score_pol_seg_room.get_scores(), room_cls),
+        ("Icon segmentation", score_seg_icon.get_scores(), icon_cls),
         ("Icon polygon segmentation", score_pol_seg_icon.get_scores(), icon_cls),
         ("Junction Prediction", absolute_error/n_heatmap_pixels),
     )
@@ -256,7 +256,7 @@ def evaluate(args, log_dir, logger, output_dir: str):
         filename="wall_junctions_per_class",
         **csv_kwargs
     )
-    
+
     points_mixed_to_csv(
         points=score_junctions_mixed.get_scores(),
         class_names=score_junctions_mixed.classes,
@@ -266,7 +266,7 @@ def evaluate(args, log_dir, logger, output_dir: str):
 
     points_no_class_to_csv(
         points=score_junctions_no_class.get_scores(),
-        filename="wall_junctions_no_class", 
+        filename="wall_junctions_no_class",
         **csv_kwargs,
     )
 
@@ -277,13 +277,15 @@ if __name__ == '__main__':
                         help='Architecture to use [\'hg_furukawa_original, segnet etc\']')
     parser.add_argument('--data-path', nargs='?', type=str, default='data/cubicasa5k/',
                         help='Path to data directory')
+    parser.add_argument('--split', nargs='?', type=str, default='test.txt',
+                        help='Dataset split')
     parser.add_argument('--n-classes', nargs='?', type=int, default=44,
                         help='# of the epochs')
     parser.add_argument('--weights', nargs='?', type=str, default=None,
                         help='Path to previously trained model weights file .pkl')
     parser.add_argument('--log-path', nargs='?', type=str, default='runs_cubi',
                         help='Path to log directory')
-    # We need an output dir so that the files do not overwrite each other. 
+    # We need an output dir so that the files do not overwrite each other.
     parser.add_argument('--output-dir', type=str, default='outputs/results')
 
     args = parser.parse_args()
