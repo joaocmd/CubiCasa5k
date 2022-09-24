@@ -175,7 +175,10 @@ def points_no_class_to_csv(points, filename: str, parent_dir: str="."):
     pd.DataFrame(results).to_csv(f"{parent_dir}/{filename}.csv", index=False)
 
 
-def evaluate(args, log_dir, logger, output_dir: str):
+def evaluate(args, log_dir, logger, output_dir: str, device="cpu"):
+    if device is None:
+        print(device)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
     normal_set = FloorplanSVG(args.data_path, args.split, format='lmdb', lmdb_folder='cubi_lmdb/',
                               augmentations=Compose([DictToTensor()]), return_heatmaps=True)
@@ -195,7 +198,7 @@ def evaluate(args, log_dir, logger, output_dir: str):
     model.load_state_dict(checkpoint['model_state'])
 
     model.eval()
-    model.cuda()
+    model.to(device)
 
     score_seg_room = runningScore(12)
     score_seg_icon = runningScore(11)

@@ -206,8 +206,8 @@ def maximum_suppression_iterative(mask, x, y, heatmap_value_threshold):
             if neighbor_value <= value and neighbor_value > heatmap_value_threshold:
                 stack.append((neighbor_x, neighbor_y))
 
-def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44):
-    images_val = val['image'].cuda()
+def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44, device="cpu"):
+    images_val = val['image'].to(device)
     labels_val = val['label']
     junctions_val = {i: [[int(x), int(y)] for x, y in v] for i, v in val['heatmaps'].items()}
 
@@ -237,8 +237,9 @@ def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44)
 
         prediction = torch.mean(prediction, 0, True)
     else:
-        prediction = model(images_val).cpu()
+        prediction = model(images_val)
 
+    prediction = prediction.to(device).cpu()
     heatmaps, rooms, icons = post_prosessing.split_prediction(
         prediction, img_size, split)
 
