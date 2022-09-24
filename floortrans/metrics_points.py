@@ -36,7 +36,7 @@ class pointScoreNoClass:
         pairs = (x for x in pairs if x[1] < distance_threshold**2)
         pairs = sorted(pairs, key=lambda p: p[1])
         pairs = [[point(p[0][0]), point(p[0][1])] for p in pairs]
-        
+
         values[2] += len(all_gt)
         points = set(point(p) for p in all_predicted)
         while len(pairs) != 0 and len(points) != 0:
@@ -110,7 +110,7 @@ class pointScorePerClass:
 
         # predicted positives
         pp = (scores[:,0] + scores[:,1])
-        precision = np.where(pp == 0, np.nan, scores[:,0] / pp) 
+        precision = np.where(pp == 0, np.nan, scores[:,0] / pp)
 
         # acc = np.sum(self.scores[:,0]) / (np.sum(self.scores[:,1]) + np.sum(self.scores[:,2]))
         # acc = np.sum(self.scores[:,0]) / (np.sum(self.scores[:,2]))
@@ -122,7 +122,7 @@ class pointScorePerClass:
 
 class pointScoreMixed:
     def __init__(self, n_classes):
-        self.classes = list(range(n_classes)) + [-1] 
+        self.classes = list(range(n_classes)) + [-1]
         self.n_classes = n_classes
         self.scores = {t: np.zeros((n_classes+1, n_classes+1), dtype=int) for t in range(0, 101, 10)} # tp fp gt
 
@@ -142,8 +142,8 @@ class pointScoreMixed:
         pairs = itertools.product(all_predicted, all_gt)
         pairs = ([pair, sqrdistance(pair[0], pair[1])] for pair in pairs)
         pairs = (x for x in pairs if x[1] < distance_threshold**2)
-        pairs = sorted(pairs, key=lambda p: (p[1], p[0][2] != p[0][2])) # the second sort terms prioritizes points with similar classes
-        
+        pairs = sorted(pairs, key=lambda p: (p[1], p[0][0][2] != p[0][1][2])) # the second sort terms prioritizes points with similar classes
+
         remaining_pred = set(all_predicted)
         remaining_gt = set(all_gt)
         while len(pairs) != 0:

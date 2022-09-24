@@ -226,7 +226,7 @@ def evaluate(args, log_dir, logger, output_dir: str, device="cpu"):
 
             junctions_gt = {k: junctions[k] for k in junctions if k in range(-1, 13)}
             junctions_pred = {k: pred_junctions[k] for k in pred_junctions if k in range(-1, 13)}
-            distance_threshold=0.02*max(val['label'].shape[2], val['label'].shape[3]) # value from r2v
+            distance_threshold=0.02*max(val['label'].shape[2], val['label'].shape[3]) # value from raster-to-vector
 
             score_junctions_per_class.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
             score_junctions_mixed.update(junctions_gt, junctions_pred, distance_threshold=distance_threshold)
