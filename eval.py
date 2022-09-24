@@ -290,6 +290,7 @@ if __name__ == '__main__':
                         help='Path to log directory')
     # We need an output dir so that the files do not overwrite each other.
     parser.add_argument('--output-dir', type=str, default='outputs/results')
+    parser.add_argument('--device', type=str, default=None)
 
     args = parser.parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
@@ -305,6 +306,6 @@ if __name__ == '__main__':
     logger.addHandler(fh)
 
     logger.info(f'Start: {time_stamp}')
-    evaluate(args, log_dir, logger, args.output_dir)
+    evaluate(args, log_dir, logger, args.output_dir, device=args.device)
     time_stamp = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
     logger.info(f'End: {time_stamp}')
