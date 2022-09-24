@@ -177,7 +177,6 @@ def points_no_class_to_csv(points, filename: str, parent_dir: str="."):
 
 def evaluate(args, log_dir, logger, output_dir: str, device="cpu"):
     if device is None:
-        print(device)
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     normal_set = FloorplanSVG(args.data_path, args.split, format='lmdb', lmdb_folder='cubi_lmdb/',
@@ -197,8 +196,8 @@ def evaluate(args, log_dir, logger, output_dir: str, device="cpu"):
 
     model.load_state_dict(checkpoint['model_state'])
 
-    model.eval()
     model.to(device)
+    model.eval()
 
     score_seg_room = runningScore(12)
     score_seg_icon = runningScore(11)
@@ -214,7 +213,7 @@ def evaluate(args, log_dir, logger, output_dir: str, device="cpu"):
         for count, val in tqdm(enumerate(data_loader), total=len(data_loader),
                                ncols=80, leave=False):
             logger.info(f'{count} - {val["folder"]}')
-            things = get_evaluation_tensors(val, model, split, logger, rotate=True)
+            things = get_evaluation_tensors(val, model, split, logger, rotate=True, device=device)
 
             label, segmentation, pol_segmentation, junctions, pred_junctions, heatmap_error = things
 
