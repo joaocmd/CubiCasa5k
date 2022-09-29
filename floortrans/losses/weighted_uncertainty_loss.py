@@ -7,7 +7,7 @@ import pandas as pd
 class WeightedUncertaintyLoss(Module):
     def __init__(self, input_slice=[21, 13, 17],
                  target_slice=[21, 1, 1], sub=0,
-                 cuda=True, mask=False):
+                 device="cpu", mask=False):
         super().__init__()
         self.input_slice = input_slice
         self.target_slice = target_slice
@@ -17,10 +17,9 @@ class WeightedUncertaintyLoss(Module):
         self.loss_heatmap = None
         self.mask = mask
         self.sub = sub
-        self.cuda = cuda
-        self.device = "cuda" if self.cuda else "cpu"
-        self.log_vars = Parameter(torch.tensor([0, 0], requires_grad=True, dtype=torch.float32).cuda())
-        self.log_vars_mse = Parameter(torch.zeros(input_slice[0], requires_grad=True, dtype=torch.float32).cuda())
+        self.device = torch.device(device)
+        self.log_vars = Parameter(torch.tensor([0, 0], requires_grad=True, dtype=torch.float32).to(self.device))
+        self.log_vars_mse = Parameter(torch.zeros(input_slice[0], requires_grad=True, dtype=torch.float32).to(self.device))
 
     def forward(self, input, target):
         n, c, h, w = input.size()
@@ -41,7 +40,7 @@ class WeightedUncertaintyLoss(Module):
         icons_target = torch.squeeze(icons_target, 1)
 
         # Segmentation labels to correct type
-        if self.cuda:
+        if self.device.type == "cuda":
             rooms_target = rooms_target.type(torch.cuda.LongTensor) - self.sub
             icons_target = icons_target.type(torch.cuda.LongTensor) - self.sub
         else:
@@ -50,7 +49,7 @@ class WeightedUncertaintyLoss(Module):
 
         if rooms_target.min().item() < 0 or rooms_target.max().item() > 11:
             print(rooms_target.min().item(), ">0", rooms_target.max().item(), "<12", rooms_pred.shape[1], "==12")
-    
+
         if icons_target.min().item() < 0 or icons_target.max().item() > 11:
             print(icons_target.min().item(), ">0", icons_target.max().item(), "<11", icons_pred.shape[1], "==11")
 
@@ -124,15 +123,15 @@ class WeightedUncertaintyLoss(Module):
             d[key] = [m.cpu()]
 
         return pd.DataFrame(data={k: [e.cpu() for e in d[k]] for k in d})
-    
+
     def get_s(self):
         s = self.log_vars.data
         mse_s = self.log_vars_mse.data
-        d = {'room s': [s[0].cuda()],
-             'icon s': [s[1].cuda()]}
+        d = {'room s': [s[0].to(self.device)],
+             'icon s': [s[1].to(self.device)]}
         for i, m in enumerate(mse_s):
             key = 'heatmap s' + str(i)
-            d[key] = [m.cuda()]
+            d[key] = [m.to(self.device)]
 
         return pd.DataFrame(data={k: [e.cpu() for e in d[k]] for k in d})
 
