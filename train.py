@@ -50,6 +50,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
 
     # Augmentation setup
     if args.scale:
+        print("With scale :D ")
         aug = Compose([RandomChoice([RandomCropToSizeTorch(data_format='dict', size=(args.image_size, args.image_size)),
                                      ResizePaddedTorch((0, 0), data_format='dict', size=(args.image_size, args.image_size))]),
                        RandomRotations(format='cubi'),
@@ -102,10 +103,10 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
         model = get_model(args.arch, args.n_classes, device=device)
 
     if args.loss == 'uncertainty':
-        criterion = UncertaintyLoss(input_slice=input_slice)
+        criterion = UncertaintyLoss(input_slice=input_slice, device=device)
     elif args.loss == 'weighted':
         print("\n\n\n\n\n", "WEIGHTED LOSS FOR SURE!", "MODEL", args.arch, "\n\n\n\n\n")
-        criterion = WeightedUncertaintyLoss(input_slice=input_slice)
+        criterion = WeightedUncertaintyLoss(input_slice=input_slice, device=device)
 
     model.to(device)
 
@@ -136,7 +137,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
     best_loss = np.inf
     best_loss_var = np.inf
     best_train_loss = np.inf
-    best_acc = 0 
+    best_acc = 0
     start_epoch = 0
     running_metrics_room_val = runningScore(input_slice[1])
     running_metrics_icon_val = runningScore(input_slice[2])
@@ -155,7 +156,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
                 start_epoch = checkpoint['epoch']
             logger.info("Loaded checkpoint '{}' (epoch {})".format(args.weights, checkpoint['epoch']))
         else:
-            logger.info("No checkpoint found at '{}'".format(args.weights)) 
+            logger.info("No checkpoint found at '{}'".format(args.weights))
 
     stop_training = False
     for epoch in range(start_epoch, args.n_epoch):
@@ -402,9 +403,12 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
              'model_state': model.state_dict(),
              'criterion_state': criterion.state_dict(),
              'optimizer_state': optimizer.state_dict()}
-    torch.save(state, log_dir+"/model_last_epoch.pkl")
-    os.remove(log_dir + f"/model_last_epoch-{epoch}")
-    open(log_dir+f"/model_last_epoch-{epoch+1}", "w").close()
+
+    # Clean directory
+    if os.path.exists(log_dir+"/model_last_epoch.pkl"):
+        torch.save(state, log_dir+"/model_last_epoch.pkl")
+        os.remove(log_dir + f"/model_last_epoch-{epoch}")
+        open(log_dir+f"/model_last_epoch-{epoch+1}", "w").close()
 
 
 if __name__ == '__main__':
@@ -447,7 +451,7 @@ if __name__ == '__main__':
     parser.add_argument('--new-hyperparams', nargs='?', type=bool,
                         default=False, const=True,
                         help='Continue training with new hyperparameters')
-    parser.add_argument('--log-path', nargs='?', type=str, default='runs_cubi/',
+    parser.add_argument('--log-path', nargs='?', type=str, default='runs_cubi',
                         help='Path to log directory')
     parser.add_argument('--debug', nargs='?', type=bool,
                         default=False, const=True,
@@ -464,9 +468,9 @@ if __name__ == '__main__':
     parser.add_argument('--seed', nargs='?', type=int, default=1989,
                         help='Seed for reproducibility')
     parser.add_argument('--device', type=str, default=None)
-    
+
     args = parser.parse_args()
-    log_dir = args.log_path + f'/{time_stamp}-{args.arch}/'
+    log_dir = f"{args.log_path}/{time_stamp}-{args.arch}"
     writer = SummaryWriter(log_dir)
     logger = logging.getLogger('train')
     logger.setLevel(logging.DEBUG)
