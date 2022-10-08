@@ -199,8 +199,12 @@ def evaluate(args, log_dir, logger, output_dir: str, device="cpu"):
     model.to(device)
     model.eval()
 
-    score_seg_room = runningScore(12)
-    score_seg_icon = runningScore(11)
+    # ["Background", "Outdoor", "Wall", "Kitchen", "Living Room" ,"Bed Room", "Bath", "Entry", "Railing", "Storage", "Garage", "Undefined"]
+    # 2 8
+    #["No Icon", "Window", "Door", "Closet", "Electrical Applience" ,"Toilet", "Sink", "Sauna Bench", "Fire Place", "Bathtub", "Chimney"]
+    # 1, 2, 3, 5, 6
+    score_seg_room = runningScore(12, [2, 8])
+    score_seg_icon = runningScore(11, [1, 2, 3, 5, 6])
     score_pol_seg_room = runningScore(12)
     score_pol_seg_icon = runningScore(11)
     score_junctions_per_class = pointScorePerClass(list(range(13)))

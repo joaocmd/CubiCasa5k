@@ -13,8 +13,9 @@ from floortrans.loaders.augmentations import RotateNTurns
 from floortrans.plotting import shp_mask
 
 class runningScore(object):
-    def __init__(self, n_classes):
+    def __init__(self, n_classes, selected_classes=None):
         self.n_classes = n_classes
+        self.selected_classes = selected_classes
         self.confusion_matrix = np.zeros((n_classes, n_classes))
 
     def _fast_hist(self, label_true, label_pred, n_class):
@@ -27,6 +28,9 @@ class runningScore(object):
 
     def update(self, label_trues, label_preds):
         for lt, lp in zip(label_trues, label_preds):
+            if self.selected_classes != None:
+                lt[~np.isin(lt, self.selected_classes)] = 0
+                lp[~np.isin(lp, self.selected_classes)] = 0
             self.confusion_matrix += self._fast_hist(
                 lt.flatten(), lp.flatten(), self.n_classes
             )
@@ -263,12 +267,12 @@ def get_evaluation_tensors(val, model, split, logger, rotate=True, n_classes=44,
 
     predicted_classes = polygons_to_tensor(
         polygons, types, room_polygons, room_types, img_size)
-    
+
     pol_rooms = np.argmax(predicted_classes[:split[1]], axis=0)
     pol_icons = np.argmax(predicted_classes[split[1]:], axis=0)
 
     heatmap_error = np.abs(heatmaps - labels_val[0][:21].numpy()).sum()
-    
+
     return (labels_val[0, 21:].data.numpy(),
             np.concatenate(([rooms_seg], [icons_seg]), axis=0),
             np.concatenate(([pol_rooms], [pol_icons]), axis=0),
