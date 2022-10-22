@@ -1,3 +1,7 @@
+Val set
+
+Test set
+
 normal results
 class,none,slide,rollup,double_d,double_u,opposite_ul_dl,opposite_ul_dr,opposite_ur_dl,opposite_ur_dr,single_dl,single_dr,single_ul,single_ur,0,45,90,135,180,225,270,315,corner
 accuracy,70.03,71.59,61.46,93.52,87.96,96.20,91.03,92.31,95.38,98.64,98.58,96.92,97.75,96.99,98.56,97.59,95.79,98.92,98.25,97.59,97.71,89.58
