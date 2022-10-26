@@ -90,7 +90,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
         model = get_model(args.arch, 51, device=device)
         if args.furukawa_weights:
             logger.info("Loading furukawa model weights from checkpoint '{}'".format(args.furukawa_weights))
-            checkpoint = torch.load(args.furukawa_weights)
+            checkpoint = torch.load(args.furukawa_weights, map_location=device)
             model.load_state_dict(checkpoint['model_state'])
 
         model.conv4_ = torch.nn.Conv2d(256, args.n_classes, bias=True, kernel_size=1)
@@ -146,7 +146,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
     if args.weights is not None:
         if os.path.exists(args.weights):
             logger.info("Loading model and optimizer from checkpoint '{}'".format(args.weights))
-            checkpoint = torch.load(args.weights)
+            checkpoint = torch.load(args.weights, map_location=device)
             model.load_state_dict(checkpoint['model_state'])
             criterion.load_state_dict(checkpoint['criterion_state'])
             if not args.new_hyperparams:
@@ -264,7 +264,7 @@ def train(args, log_dir, writer, logger, seed, device="cpu"):
                 no_improvement += 1
             if no_improvement >= args.patience and current_lr['base'] > args.min_l_rate:
                 logger.info("No no_improvement for " + str(no_improvement) + " loading last best model and reducing learning rate.")
-                checkpoint = torch.load(log_dir+"/model_best_val_loss_var.pkl")
+                checkpoint = torch.load(log_dir+"/model_best_val_loss_var.pkl", map_location=device)
                 model.load_state_dict(checkpoint['model_state'])
                 for i, p in enumerate(optimizer.param_groups):
                     optimizer.param_groups[i]['lr'] = p['lr'] * 0.1
